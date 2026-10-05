@@ -1,8 +1,4 @@
-import {
-	rewriteCss,
-	rewriteUrl,
-	unrewriteCss,
-} from "@mercuryworkshop/scramjet/bundled";
+import { rewriteCss, rewriteUrl, unrewriteCss } from "@ramjet/core/bundled";
 import { directTest, type Test } from "../testcommon.ts";
 
 function createRewriteContext() {
@@ -41,7 +37,7 @@ function cssRewriteTest(props: {
 			assertEqual(
 				rewritten,
 				expected,
-				`${name}: ${input} should be rewritten to ${expected}`
+				`${name}: ${input} should be rewritten to ${expected}`,
 			);
 		},
 	});
@@ -65,7 +61,7 @@ function cssRewriteMultiTest(props: {
 			assertEqual(
 				rewriteCss(input, context, meta),
 				expected,
-				`${name}: multi-url rewrite`
+				`${name}: multi-url rewrite`,
 			);
 		},
 	});
@@ -87,7 +83,7 @@ function cssUnrewriteTest(props: {
 			assertEqual(
 				unrewritten,
 				expected,
-				`${name}: ${input} should be unrewritten to ${expected}`
+				`${name}: ${input} should be unrewritten to ${expected}`,
 			);
 		},
 	});
@@ -118,7 +114,7 @@ export default [
 			`@import url("${encoded}");`,
 		],
 	}),
-	// below tests were llm generated
+
 	cssRewriteTest({
 		name: "rewriter-css-import-quoted-string-layer-block",
 		url: "/tokens.css",
@@ -249,7 +245,7 @@ export default [
 			assertEqual(
 				rewriteCss(input, context, meta),
 				`i{background:url(${enc})}`,
-				"data: URLs must survive rewrite (commas/quotes inside payload)"
+				"data: URLs must survive rewrite (commas/quotes inside payload)",
 			);
 		},
 	}),
@@ -262,7 +258,7 @@ export default [
 			const input = `i{background:url("${data}")}`;
 			assertEqual(
 				rewriteCss(input, context, meta),
-				`i{background:url("${enc}")}`
+				`i{background:url("${enc}")}`,
 			);
 		},
 	}),
@@ -275,7 +271,7 @@ export default [
 			const input = `a{background:url("${first}"), url("${second}")}`;
 			assertEqual(
 				rewriteCss(input, context, meta),
-				`a{background:url("${rewriteUrl(first, context, meta)}"), url("${rewriteUrl(second, context, meta)}")}`
+				`a{background:url("${rewriteUrl(first, context, meta)}"), url("${rewriteUrl(second, context, meta)}")}`,
 			);
 		},
 	}),

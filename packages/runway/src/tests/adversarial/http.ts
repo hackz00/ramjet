@@ -1,12 +1,6 @@
 import { serverTest, basicTest } from "../../testcommon.ts";
 import { gzipSync } from "zlib";
 
-// Every request a page makes is re-issued by the proxy, so the whole HTTP
-// surface has to survive the round trip: methods, bodies of every type, request
-// and response headers, status codes, redirects, ranges, streaming and aborts.
-// This is also where proxy plumbing would be most visible - an injected header
-// showing up in Headers or getAllResponseHeaders() is a direct leak.
-
 const httpTest = (name: string, js: string) =>
 	serverTest({
 		name,
@@ -37,8 +31,8 @@ const httpTest = (name: string, js: string) =>
 								query: url.search,
 								headers: req.headers,
 								body: Buffer.concat(chunks).toString("utf8"),
-							})
-						)
+							}),
+						),
 					);
 					return;
 				}
@@ -51,7 +45,7 @@ const httpTest = (name: string, js: string) =>
 							"X-Multi": "a, b",
 							"Set-Cookie": "srvcookie=srvvalue; Path=/",
 						},
-						"headers"
+						"headers",
 					);
 				}
 				if (path === "/httponly") {
@@ -61,7 +55,7 @@ const httpTest = (name: string, js: string) =>
 							"Content-Type": "text/plain",
 							"Set-Cookie": "hocookie=hovalue; Path=/; HttpOnly",
 						},
-						"ok"
+						"ok",
 					);
 				}
 				if (path === "/status") {
@@ -81,7 +75,7 @@ const httpTest = (name: string, js: string) =>
 							"Content-Encoding": "gzip",
 							"Content-Length": String(body.length),
 						},
-						body
+						body,
 					);
 				}
 				if (path === "/range") {
@@ -98,19 +92,19 @@ const httpTest = (name: string, js: string) =>
 								"Content-Range": "bytes " + s + "-" + e + "/" + full.length,
 								"Accept-Ranges": "bytes",
 							},
-							full.subarray(s, e + 1)
+							full.subarray(s, e + 1),
 						);
 					}
 					return send(
 						200,
 						{ "Content-Type": "text/plain", "Accept-Ranges": "bytes" },
-						full
+						full,
 					);
 				}
 				if (path === "/slow") {
 					setTimeout(
 						() => send(200, { "Content-Type": "text/plain" }, "slow"),
-						1500
+						1500,
 					);
 					return;
 				}
@@ -153,7 +147,7 @@ export default [
 			const head = await fetch("/echo", { method: "HEAD" });
 			assertEqual(head.status, 200, "HEAD status");
 			assertEqual(await head.text(), "", "HEAD has no body");
-		`
+		`,
 	),
 	httpTest(
 		"http-body-types",
@@ -187,7 +181,7 @@ export default [
 
 			const abRes = await (await fetch("/echo", { method: "POST", body: new TextEncoder().encode("abbody") })).json();
 			assertEqual(abRes.body, "abbody", "typed array body");
-		`
+		`,
 	),
 	httpTest(
 		"http-request-headers",
@@ -199,9 +193,9 @@ export default [
 			assertEqual(j.headers["authorization"], "Bearer tok", "Authorization header");
 			assertEqual(j.headers["accept"], "application/json", "Accept header");
 			assertEqual(j.headers["host"], location.host, "Host header matches the site: " + j.headers["host"]);
-			assert(!Object.keys(j.headers).some((h) => h.includes("scramjet")),
+			assert(!Object.keys(j.headers).some((h) => h.includes("ramjet")),
 				"no proxy header reaches the origin: " + JSON.stringify(Object.keys(j.headers)));
-		`
+		`,
 	),
 	httpTest(
 		"http-response-headers",
@@ -213,9 +207,9 @@ export default [
 			assertEqual(r.headers.get("set-cookie"), null, "set-cookie is a forbidden response header");
 			assertEqual(r.headers.has("x-multi"), true, "has()");
 			const names = [...r.headers.keys()];
-			assert(!names.some((n) => n.includes("scramjet")), "no proxy headers exposed: " + JSON.stringify(names));
+			assert(!names.some((n) => n.includes("ramjet")), "no proxy headers exposed: " + JSON.stringify(names));
 			assertEqual(await r.text(), "headers", "body");
-		`
+		`,
 	),
 	httpTest(
 		"http-status-codes",
@@ -229,7 +223,7 @@ export default [
 			const r204 = await fetch("/status?code=204");
 			assertEqual(r204.status, 204, "204 status");
 			assertEqual(await r204.text(), "", "204 has no body");
-		`
+		`,
 	),
 	httpTest(
 		"http-redirect-follow",
@@ -240,7 +234,7 @@ export default [
 			assertEqual(r.url, location.origin + "/echo", "final URL");
 			assert(!r.url.includes("/~/sj/"), "no proxy URL in the final URL");
 			assertEqual((await r.json()).path, "/echo", "landed on the target");
-		`
+		`,
 	),
 	httpTest(
 		"http-redirect-modes",
@@ -251,7 +245,7 @@ export default [
 			let threw = false;
 			try { await fetch("/redirect?to=/echo", { redirect: "error" }); } catch { threw = true; }
 			assert(threw, "redirect: error must reject");
-		`
+		`,
 	),
 	httpTest(
 		"http-abort",
@@ -267,7 +261,7 @@ export default [
 			let err2;
 			try { await fetch("/echo", { signal: AbortSignal.abort() }); } catch (e) { err2 = e; }
 			assertEqual(err2 && err2.name, "AbortError", "an already-aborted signal");
-		`
+		`,
 	),
 	httpTest(
 		"http-streaming-and-clone",
@@ -289,7 +283,7 @@ export default [
 			let reuse = false;
 			try { await r2.text(); } catch { reuse = true; }
 			assert(reuse, "reading a used body must throw");
-		`
+		`,
 	),
 	httpTest(
 		"http-content-encoding",
@@ -297,7 +291,7 @@ export default [
 			const r = await fetch("/gzip");
 			assertEqual(await r.text(), "gzipped-payload", "gzip is transparently decoded");
 			assertEqual(r.status, 200, "status");
-		`
+		`,
 	),
 	httpTest(
 		"http-range-requests",
@@ -307,7 +301,7 @@ export default [
 			assertEqual(await r.text(), "2345", "partial body");
 			assertEqual(r.headers.get("content-range"), "bytes 2-5/10", "content-range");
 			assertEqual(r.headers.get("accept-ranges"), "bytes", "accept-ranges");
-		`
+		`,
 	),
 	httpTest(
 		"http-credentials-include",
@@ -319,7 +313,7 @@ export default [
 			const same = await (await fetch("/echo", { credentials: "same-origin" })).json();
 			assert((same.headers.cookie || "").includes("hocookie=hovalue"),
 				"credentials: same-origin sends them too: " + same.headers.cookie);
-		`
+		`,
 	),
 	httpTest(
 		"http-httponly-not-scriptable",
@@ -330,21 +324,16 @@ export default [
 			const j = await (await fetch("/echo")).json();
 			assert((j.headers.cookie || "").includes("hocookie=hovalue"),
 				"but must still be sent: " + j.headers.cookie);
-		`
+		`,
 	),
 	httpTest(
-		// KNOWN FAILURE: credentials: "omit" still sends the jar. That option is
-		// how code deliberately makes an unauthenticated request - third-party
-		// API calls, token-refresh endpoints, cache-friendly asset fetches - so
-		// sending the session cookie anyway is both a correctness and a privacy
-		// problem.
 		"http-credentials-omit",
 		`
 			await fetch("/httponly");
 			const omit = await (await fetch("/echo", { credentials: "omit" })).json();
 			assert(!(omit.headers.cookie || "").includes("hocookie"),
 				"credentials: omit must not send cookies: " + omit.headers.cookie);
-		`
+		`,
 	),
 	httpTest(
 		"http-request-object",
@@ -359,7 +348,7 @@ export default [
 			assertEqual(j.headers["x-a"], "1", "fetch(Request) sends the headers");
 			assertEqual(await clone.text(), "reqbody", "clone body");
 			assertEqual((await (await fetch(new Request("/echo?q=1"))).json()).query, "?q=1", "query preserved");
-		`
+		`,
 	),
 	httpTest(
 		"http-xhr-headers-and-states",
@@ -379,7 +368,7 @@ export default [
 			assertEqual(xhr.status, 200, "status");
 			assertEqual(xhr.statusText, "OK", "statusText");
 			assertEqual(xhr.responseURL, location.origin + "/echo", "responseURL");
-		`
+		`,
 	),
 	httpTest(
 		"http-xhr-response-headers",
@@ -394,9 +383,9 @@ export default [
 			assertEqual(xhr.getResponseHeader("set-cookie"), null, "set-cookie is forbidden");
 			const all = xhr.getAllResponseHeaders();
 			assert(all.includes("x-custom: customvalue"), "getAllResponseHeaders: " + JSON.stringify(all));
-			assert(!all.includes("scramjet"), "no proxy headers listed: " + JSON.stringify(all));
+			assert(!all.includes("ramjet"), "no proxy headers listed: " + JSON.stringify(all));
 			assert(!all.toLowerCase().includes("set-cookie"), "no set-cookie listed: " + JSON.stringify(all));
-		`
+		`,
 	),
 	httpTest(
 		"http-xhr-response-types",
@@ -411,7 +400,7 @@ export default [
 			assert((await get("blob")) instanceof Blob, "responseType blob");
 			assert((await get("arraybuffer")) instanceof ArrayBuffer, "responseType arraybuffer");
 			assertEqual(typeof (await get("text")), "string", "responseType text");
-		`
+		`,
 	),
 	httpTest(
 		"http-xhr-abort-and-errors",
@@ -429,12 +418,9 @@ export default [
 			await new Promise((res) => { x404.onloadend = res; x404.open("GET", "/status?code=404"); x404.send(); });
 			assertEqual(x404.status, 404, "404 status");
 			assertEqual(x404.responseText, "body-404", "404 body");
-		`
+		`,
 	),
 
-	// ------------------------------------------------------------------
-	// the fetch object model, no server needed
-	// ------------------------------------------------------------------
 	basicTest({
 		name: "http-headers-object",
 		js: `
@@ -501,6 +487,6 @@ export default [
 			assertEqual(custom.data, "second", "a custom event type");
 			assertEqual(es.readyState, 1, "OPEN while streaming");
 			es.close();
-		`
+		`,
 	),
 ];

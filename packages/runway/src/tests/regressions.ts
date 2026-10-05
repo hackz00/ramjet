@@ -1,9 +1,6 @@
 import { basicTest, serverTest } from "../testcommon.ts";
-// historical regressions
 
 export default [
-	// scramjet/core
-	// introduced by: ?
 	// fixed by: https://github.com/HeyPuter/browser.js/commit/1715a6aeb072284b58ce38f807f1b14f5151dd7a
 	basicTest({
 		name: "regression-1715-for-body-walk",
@@ -22,8 +19,6 @@ export default [
     `,
 	}),
 
-	// scramjet/core
-	// introduced by: ?
 	// fixed by: https://github.com/HeyPuter/browser.js/commit/ae35b473dd2cbb0b76d3098e9a748e296cedf425
 	basicTest({
 		name: "regression-ae35-optional-postmessage",
@@ -41,9 +36,6 @@ export default [
       `,
 	}),
 
-	// scramjet/rewriter
-	// tree would be culled if destructure_rewrites was off and a destructure happened
-	// introduced by: ?
 	// fixed by https://github.com/HeyPuter/browser.js/commit/09f823c9573f9cdd09bc94663a384ace9816fd4c
 	// related issue: https://discord.com/channels/1259284248129437726/1457141828557078592
 	basicTest({
@@ -56,10 +48,6 @@ export default [
 		`,
 	}),
 
-	// scramjet/rewriter
-	// crash on overlapping CleanFunction and importfn
-	// TODO: this only happens when destructure_rewrites is on. harness does not let you set flags
-	// introduced by: ?
 	// fixed by https://github.com/HeyPuter/browser.js/commit/09f823c9573f9cdd09bc94663a384ace9816fd4c
 	// related issue: https://discord.com/channels/1259284248129437726/1457141828557078592
 	basicTest({
@@ -69,12 +57,9 @@ export default [
 		`,
 	}),
 
-	// scramjet/html
-	// module script metadata must stay in scramjet's reserved query params.
-	// Leaking it as an upstream type=module query can make module graphs load twice.
 	serverTest({
 		name: "regression-module-script-query-does-not-leak",
-		scramjetOnly: true,
+		ramjetOnly: true,
 		async start(server) {
 			let depRequests = 0;
 			server.on("request", (req, res) => {
@@ -100,11 +85,11 @@ export default [
 					res.writeHead(200, { "Content-Type": "application/javascript" });
 					if (url.searchParams.get("real") !== "1") {
 						res.end(
-							`window.fail("original module script query was not preserved")`
+							`window.fail("original module script query was not preserved")`,
 						);
 					} else if (url.searchParams.has("type")) {
 						res.end(
-							`window.fail("scramjet module marker leaked upstream", { search: ${JSON.stringify(url.search)} })`
+							`window.fail("ramjet module marker leaked upstream", { search: ${JSON.stringify(url.search)} })`,
 						);
 					} else {
 						res.end(`
@@ -125,11 +110,11 @@ export default [
 					res.writeHead(200, { "Content-Type": "application/javascript" });
 					if (url.searchParams.get("real") !== "1") {
 						res.end(
-							`window.fail("original module dependency query was not preserved")`
+							`window.fail("original module dependency query was not preserved")`,
 						);
 					} else if (url.searchParams.has("type")) {
 						res.end(
-							`window.fail("scramjet module marker leaked upstream from dependency", { search: ${JSON.stringify(url.search)} })`
+							`window.fail("ramjet module marker leaked upstream from dependency", { search: ${JSON.stringify(url.search)} })`,
 						);
 					} else {
 						res.end(`export default 1;`);
@@ -149,8 +134,6 @@ export default [
 		},
 	}),
 
-	// scramjet/core/rewriter
-	// non-computed keys of a destructured objects were wrapped with $scramjet$prop, causing invalid syntax
 	// fixed by https://github.com/HeyPuter/browser.js/commit/7d4be594f2c49a447252e0a520ff0e144bef28b2
 	basicTest({
 		name: "regression-09f823c-rewriter-destructure-invalid-syntax",
@@ -198,15 +181,10 @@ export default [
 		`,
 	}),
 
-	// scramjet/core
-	// History.prototype.pushState / replaceState used the proxy's closure `client`
-	// instead of the client owning `ctx.this`, so a displaced call resolved the
-	// relative URL against the wrong frame.
-	// lead to youtube.com search breaking in chrome
 	// fixed by https://github.com/HeyPuter/browser.js/commit/1b988b4b53fac31c6627fd011d13028b9daff78c
 	serverTest({
 		name: "regression-1b988b4-displaced-history-pushstate",
-		scramjetOnly: true,
+		ramjetOnly: true,
 		async start(server) {
 			server.on("request", (req, res) => {
 				if (req.url === "/") {
@@ -251,7 +229,7 @@ export default [
 				if (req.url === "/sub/page.html") {
 					res.writeHead(200, { "Content-Type": "text/html" });
 					res.end(
-						"<!doctype html><html><head></head><body><p>iframe page</p></body></html>"
+						"<!doctype html><html><head></head><body><p>iframe page</p></body></html>",
 					);
 					return;
 				}

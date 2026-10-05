@@ -1,17 +1,16 @@
-// import { flagEnabled } from "@/shared";
 import type { URLMeta } from "@rewriters/url";
 import { Error, Math_min, Performance_now } from "@/shared/snapshot";
 
 const logfuncs = {
-	// eslint-disable-next-line scramjet-core/no-globals
+	// eslint-disable-next-line ramjet-core/no-globals
 	log: console.log,
-	// eslint-disable-next-line scramjet-core/no-globals
+	// eslint-disable-next-line ramjet-core/no-globals
 	warn: console.warn,
-	// eslint-disable-next-line scramjet-core/no-globals
+	// eslint-disable-next-line ramjet-core/no-globals
 	error: console.error,
-	// eslint-disable-next-line scramjet-core/no-globals
+	// eslint-disable-next-line ramjet-core/no-globals
 	debug: console.debug,
-	// eslint-disable-next-line scramjet-core/no-globals
+	// eslint-disable-next-line ramjet-core/no-globals
 	info: console.info,
 };
 
@@ -20,15 +19,13 @@ export default {
 		const old = Error.prepareStackTrace;
 
 		Error.prepareStackTrace = (_, stack) => {
-			stack.shift(); // stack();
-			stack.shift(); // fmt();
+			stack.shift();
+			stack.shift();
 			stack.shift();
 
 			let fmt = "";
 			for (let i = 1; i < Math_min(2, stack.length); i++) {
 				if (stack[i].getFunctionName()) {
-					// const f = stack[i].getThis()?.constructor?.name;
-					// if (f) fmt += `${f}.`
 					fmt += `${stack[i].getFunctionName()} -> ` + fmt;
 				}
 			}
@@ -81,7 +78,7 @@ export default {
   	font-size: 0.9em;
   `,
 			`${severity === "debug" ? "color: gray" : ""}`,
-			...args
+			...args,
 		);
 	},
 	log: function (message: string, ...args: any[]) {
@@ -111,7 +108,7 @@ export default {
 		this.print(
 			"debug",
 			"[time]",
-			`${type} was ${timespan} (${duration.toFixed(2)}ms)`
+			`${type} was ${timespan} (${duration.toFixed(2)}ms)`,
 		);
 	},
 };

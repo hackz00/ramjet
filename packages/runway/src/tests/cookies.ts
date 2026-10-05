@@ -29,8 +29,7 @@ export default [
 	serverTest({
 		name: "cookies-twitter",
 		hostname: "x.com",
-		// api.x.com is already under x.com for routing; list it when it is not a subdomain
-		// of hostname (e.g. hostname "cdn.net" + cleartextHosts: ["api.other.net"]).
+
 		cleartextHosts: ["api.x.com"],
 		js: `
 		await fetch("/set-cookie", { credentials: "include" });
@@ -42,8 +41,6 @@ export default [
 		`,
 		autoPass: false,
 		start: async (server, _port, { fail }) => {
-			// Same cookie *names* as typical x.com responses; values are non-secret fixtures.
-			// `__cf_bm` uses Domain=x.com (host-only) and must not be sent on api.x.com.
 			const expectedOnApi = {
 				kdt: "fixture-kdt-AAAAAAAAAAAAAAAAAAAAAAAA",
 				att: "",
@@ -161,10 +158,10 @@ export default [
 		autoPass: false,
 		js: `
         assert(!document.cookie.includes("runway_cookie=testvalue"), "document.cookie should be empty");
-        
+
         let img = new Image();
         img.src = "/set-cookie";
-        
+
         document.body.appendChild(img);
         await new Promise(resolve => img.onerror= resolve);
 

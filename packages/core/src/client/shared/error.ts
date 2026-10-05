@@ -1,11 +1,10 @@
 import { unrewriteUrl } from "@rewriters/url";
-import { ScramjetClient } from "@client/index";
+import { RamjetClient } from "@client/index";
 
-export const enabled = (client: ScramjetClient) =>
+export const enabled = (client: RamjetClient) =>
 	client.flagEnabled("cleanErrors");
 
-export default function (client: ScramjetClient, _self: Self) {
-	// v8 only. all we need to do is clean the scramjet urls from stack traces
+export default function (client: RamjetClient, _self: Self) {
 	const closure = (error, stack) => {
 		let newstack = error.stack;
 
@@ -14,7 +13,6 @@ export default function (client: ScramjetClient, _self: Self) {
 
 			try {
 				if (client.config.maskedfiles.some((f) => url.endsWith(f))) {
-					// strip stack frames including scramjet handlers from the trace
 					const lines = newstack.split("\n");
 					const line = lines.find((l) => l.includes(url));
 					lines.splice(line, 1);
@@ -32,11 +30,8 @@ export default function (client: ScramjetClient, _self: Self) {
 	};
 	client.Trap("Error.prepareStackTrace", {
 		get(_ctx) {
-			// this is a funny js quirk. the getter is ran every time you type something in console
 			return closure;
 		},
-		set(_value) {
-			// just ignore it if a site tries setting their own. not much we can really do
-		},
+		set(_value) {},
 	});
 }

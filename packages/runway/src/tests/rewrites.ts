@@ -1,12 +1,6 @@
 import { basicTest } from "../testcommon.ts";
 
 export default [
-	// ===========================================
-	// UNSAFE_GLOBALS: top, parent, location, eval
-	// ===========================================
-
-	// should not be able to get a reference to any of them
-
 	basicTest({
 		name: "rewriter-globals-global",
 		js: `

@@ -1,13 +1,5 @@
-//! JS source templates for each AST node type.
-//!
-//! Each template is a string with named holes like `{BODY}` that get filled
-//! by the witness composer. Templates are kept minimal — the goal is to
-//! produce a tiny program that exhibits the missed rewrite.
-//!
-//! Templates use a single hole `{X}` whose name matches a field/variant name
-//! in the AST table. The composer substitutes either:
-//! - the chosen path's next node (for the field/variant on the path), or
-//! - the `placeholder()` for the field's type (for all other holes).
+
+
 
 pub fn template(node: &str) -> &'static str {
     match node {

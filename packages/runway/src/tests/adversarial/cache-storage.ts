@@ -1,14 +1,5 @@
 import { basicTest } from "../../testcommon.ts";
 
-// The Cache API is namespaced per proxied origin the same way IndexedDB and
-// localStorage are, so the same un-namespacing duty applies - and it has an
-// extra surface the others don't: the Request keys it hands back, whose URLs
-// must be the site's.
-//
-// This is the PWA critical path. The canonical service-worker install step is
-// `cache.addAll(PRECACHE)`, and the canonical activate step is
-// `caches.keys().then(ns => ns.filter(n => n !== CURRENT).map(caches.delete))`.
-
 export default [
 	basicTest({
 		name: "cachestorage-put-and-match",
@@ -41,26 +32,20 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
 	basicTest({
-		// KNOWN FAILURE: caches.keys() reports the namespaced name
 		// ("http://site@name" instead of "name"). The standard activate-time
-		// cleanup filters this list against a known cache name, so it either
-		// matches nothing and deletes every cache, or matches nothing and cleans
-		// up none of them.
+
 		name: "cachestorage-keys-not-namespaced",
 		js: `
 			const c = await caches.open("adversarial-cache3");
 			const names = await caches.keys();
 			assert(names.includes("adversarial-cache3"), "own cache is listed under its own name: " + JSON.stringify(names));
-			assert(!names.some((n) => n.includes("scramjet")), "no proxy-internal caches listed: " + JSON.stringify(names));
+			assert(!names.some((n) => n.includes("ramjet")), "no proxy-internal caches listed: " + JSON.stringify(names));
 			assert(!names.some((n) => n.includes("http")), "no namespaced names: " + JSON.stringify(names));
 			await caches.delete("adversarial-cache3");
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: the Request objects from cache.keys() carry the proxy
-		// origin, so code that re-fetches or compares them targets the wrong host.
 		name: "cachestorage-request-keys-urls",
 		js: `
 			const c = await caches.open("adversarial-cache4");
@@ -72,8 +57,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: cache.add and cache.addAll reject with "Request failed".
-		// addAll is how every precaching service worker populates its cache.
 		name: "cachestorage-add-and-addall",
 		js: `
 			const c = await caches.open("adversarial-cache5");

@@ -1,0 +1,101 @@
+name: Release
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      draft_release:
+        description: "Create a draft GitHub Release with the built assets"
+        type: boolean
+        default: false
+      publish:
+        description: "Publish the tarballs to npm (needs environment approval)"
+        type: boolean
+        default: false
+      tag:
+        description: "npm dist-tag (for example latest, next, alpha)"
+        type: string
+        default: "next"
+
+env:
+  WASM_BINDGEN_VERSION: "0.2.105"
+
+jobs:
+  build:
+    name: Build, pack, verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Setup rewriter toolchain
+        uses: ./.github/actions/setup-rewriter-toolchain
+        with:
+          wasm-bindgen-version: ${{ env.WASM_BINDGEN_VERSION }}
+          rewriter-path: packages/core/rewriter
+          github-token: ${{ github.token }}
+      - name: Build, pack, archive the source, scan for private files, checksum
+        run: node scripts/make-release.mjs
+      - name: Validate a fresh install of the tarballs
+        run: node scripts/verify-release.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ramjet-release
+          path: release-artifacts/*
+
+  draft-release:
+    name: Draft GitHub Release
+    if: ${{ inputs.draft_release }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ramjet-release
+          path: release-artifacts
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version=$(node -p "require('./release-artifacts/MANIFEST.json').version")
+          commit=$(node -p "require('./release-artifacts/MANIFEST.json').commit")
+          gh release create "v${version}-${commit:0:8}" --draft --target "$commit" \
+            --title "Ramjet ${version}" --notes-file release-artifacts/RELEASE-NOTES.md \
+            release-artifacts/*.tgz release-artifacts/*.tar.gz release-artifacts/SHA256SUMS release-artifacts/MANIFEST.json
+
+  publish:
+    name: Publish to npm
+    if: ${{ inputs.publish }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment: npm-release
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ramjet-release
+          path: release-artifacts
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_DIST_TAG: ${{ inputs.tag }}
+        run: |
+          for tarball in release-artifacts/*.tgz; do
+            if tar -xOf "$tarball" package/package.json | node -e 'let s=""; process.stdin.on("data", c => s += c); process.stdin.on("end", () => process.exit(JSON.parse(s).private === true ? 0 : 1));'; then
+              echo "Skipping private package: $tarball"
+              continue
+            fi
+            npm publish "$tarball" --access public --tag "$NPM_DIST_TAG"
+          done

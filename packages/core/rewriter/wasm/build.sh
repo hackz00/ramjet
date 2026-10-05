@@ -14,10 +14,13 @@ fi
 
 MODE="release"
 if [ "${RELEASE:-0}" != "1" ]; then MODE="debug"; fi
+# Ramjet: "speed" (default) tunes for runtime speed; "size" restores the upstream size-optimized build.
+PROFILE="${RAMJET_WASM_PROFILE:-speed}"
+if [ "$PROFILE" != "speed" ] && [ "$PROFILE" != "size" ]; then echo "RAMJET_WASM_PROFILE must be speed|size"; exit 1; fi
 # shellcheck disable=SC2046
-SRC_HASH=$( (echo "MODE=${MODE}"; sha256sum $(find ../ -type f -not -path "*/\.*" -and \( -name "*.rs" -o -name "*.toml" -o -name "*.sh" -o -name "*.json" -o -name "*.md" \); echo Cargo.toml; echo build.sh) 2>/dev/null | sort -k2 | sha256sum ) | sha256sum | cut -d' ' -f1 ) || SRC_HASH="unknown"
+SRC_HASH=$( (echo "MODE=${MODE}"; echo "PROFILE=${PROFILE}"; sha256sum $(find ../ -type f -not -path "*/\.*" -and \( -name "*.rs" -o -name "*.toml" -o -name "*.sh" -o -name "*.json" -o -name "*.md" \); echo Cargo.toml; echo build.sh) 2>/dev/null | sort -k2 | sha256sum ) | sha256sum | cut -d' ' -f1 ) || SRC_HASH="unknown"
 
-if [ -f out/.build-hash ] && [ -f ../../dist/scramjet.wasm ] && [ "$SRC_HASH" != "unknown" ] && grep -q "$SRC_HASH" out/.build-hash; then
+if [ -f out/.build-hash ] && [ -f ../../dist/ramjet.wasm ] && [ "$SRC_HASH" != "unknown" ] && grep -q "$SRC_HASH" out/.build-hash; then
   echo "Rewriter sources unchanged (hash $SRC_HASH); skipping rebuild."
   exit 0
 fi
@@ -35,16 +38,20 @@ fi
 
 (
 	export RUSTFLAGS='-Zlocation-detail=none -Zfmt-debug=none'
-	if [ "${OPTIMIZE_FOR_SIZE:-0}" = "1" ]; then
-		export RUSTFLAGS="${RUSTFLAGS} -C opt-level=z"
-	fi
 	STD_FEATURES=""
-	if [ "${OPTIMIZE_FOR_SPEED:-0}" = "0" ]; then
-		STD_FEATURES="${STD_FEATURES},optimize_for_size"
+	if [ "$PROFILE" = "size" ]; then
+		RUSTFLAGS="${RUSTFLAGS} -C opt-level=z"
+		STD_FEATURES="optimize_for_size"
+	else
+		RUSTFLAGS="${RUSTFLAGS} -C target-feature=+simd128,+bulk-memory,+sign-ext"
 	fi
-	cargo +nightly build --release --target wasm32-unknown-unknown \
-		-Z build-std=panic_abort,std -Z build-std-features=${STD_FEATURES} \
-		--no-default-features --features "$FEATURES"
+	if [ "${OPTIMIZE_FOR_SIZE:-0}" = "1" ]; then
+		RUSTFLAGS="${RUSTFLAGS} -C opt-level=z"
+	fi
+	export RUSTFLAGS
+	STD_FEATURE_ARGS=()
+	if [ -n "$STD_FEATURES" ]; then STD_FEATURE_ARGS=(-Z "build-std-features=${STD_FEATURES}"); fi
+	cargo +nightly build --release --target wasm32-unknown-unknown 		-Z build-std=panic_abort,std "${STD_FEATURE_ARGS[@]}" 		--no-default-features --features "$FEATURES"
 )
 wasm-bindgen --target web --out-dir out/ ../target/wasm32-unknown-unknown/release/wasm.wasm
 
@@ -53,6 +60,11 @@ if [[ "$OSTYPE" == "darwin"* ]] || [[ "$OSTYPE" == "freebsd"* ]] || [[ "$OSTYPE"
 else
 	sed -i 's/import.meta.url/""/g' out/wasm.js
 fi
+
+# Ramjet: a module compiled in another same-origin realm (the controller page) fails `instanceof` against this
+# realm's WebAssembly.Module; check the brand instead so frames can reuse the controller's compiled module.
+sed -i 's/if (!(module instanceof WebAssembly.Module)) {/if (Object.prototype.toString.call(module) !== "[object WebAssembly.Module]") {/' out/wasm.js
+grep -q 'object WebAssembly.Module' out/wasm.js || { echo "failed to patch wasm.js module brand check"; exit 1; }
 
 cd ../../
 
@@ -107,15 +119,16 @@ wasm-snip rewriter/wasm/out/wasm_bg.wasm -o rewriter/wasm/out/wasm_snipped.wasm 
 if [ "${RELEASE:-0}" = "1" ]; then
 	(
 		G="--generate-global-effects"
-		# shellcheck disable=SC2086
-		time wasm-opt $WASMOPTFLAGS \
-			rewriter/wasm/out/wasm_snipped.wasm -o rewriter/wasm/out/optimized.wasm \
-			--converge -tnh --vacuum \
-			$G -O4 $G --flatten $G --rereloop $G -O4 $G -O4 $G -O4 \
-			$G -Oz $G --flatten $G --rereloop $G -Oz $G -Oz $G -Oz \
-			$G --code-folding $G --const-hoisting $G --dae $G --flatten $G --merge-locals \
-			$G -O4 $G --flatten $G --rereloop $G -O4 $G -O4 $G -O4 \
-			$G -Oz $G --flatten $G --rereloop $G -Oz $G -Oz $G -Oz
+		FEATURES_OPT="--enable-simd --enable-bulk-memory --enable-sign-ext --enable-nontrapping-float-to-int --enable-mutable-globals --enable-multivalue --enable-reference-types"
+		if [ "$PROFILE" = "size" ]; then
+			# upstream pipeline (size-optimized)
+			# shellcheck disable=SC2086
+			time wasm-opt $WASMOPTFLAGS $FEATURES_OPT 				rewriter/wasm/out/wasm_snipped.wasm -o rewriter/wasm/out/optimized.wasm 				--converge -tnh --vacuum 				$G -O4 $G --flatten $G --rereloop $G -O4 $G -O4 $G -O4 				$G -Oz $G --flatten $G --rereloop $G -Oz $G -Oz $G -Oz 				$G --code-folding $G --const-hoisting $G --dae $G --flatten $G --merge-locals 				$G -O4 $G --flatten $G --rereloop $G -O4 $G -O4 $G -O4 				$G -Oz $G --flatten $G --rereloop $G -Oz $G -Oz $G -Oz
+		else
+			# speed pipeline: -O3 to a fixpoint, then drop names/producers (kept until now so wasm-snip can match symbols)
+			# shellcheck disable=SC2086
+			time wasm-opt $WASMOPTFLAGS $FEATURES_OPT 				rewriter/wasm/out/wasm_snipped.wasm -o rewriter/wasm/out/optimized.wasm 				-tnh $G -O3 $G -O3 --converge 				--strip-debug --strip-producers
+		fi
 	)
 else
 	cp rewriter/wasm/out/wasm_snipped.wasm rewriter/wasm/out/optimized.wasm
@@ -123,6 +136,6 @@ fi
 
 mkdir -p dist/
 
-cp rewriter/wasm/out/optimized.wasm dist/scramjet.wasm
+cp rewriter/wasm/out/optimized.wasm dist/ramjet.wasm
 echo "$SRC_HASH" > rewriter/wasm/out/.build-hash || true
-echo "Rewriter Build Complete!"
+echo "Rewriter Build Complete! profile=${PROFILE} size=$(wc -c < dist/ramjet.wasm) bytes"

@@ -1,10 +1,5 @@
 import { basicTest } from "../../testcommon.ts";
 
-// URL-bearing element properties are reflected: the attribute keeps the page's
-// literal value while the IDL property resolves against the *real* document
-// URL. Anything that leaks the proxy URL here shows up in analytics payloads,
-// CORS checks, cache keys and `new URL(el.href)` comparisons.
-
 export default [
 	basicTest({
 		name: "elurls-img-src",
@@ -148,12 +143,7 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
 	basicTest({
-		// KNOWN FAILURE: HTMLAnchorElement's stringifier is not proxied, so
-		// `String(a)` / `a + ""` / `a.toString()` return the proxy URL even
-		// though `a.href` is correct. Anchor stringification is common in
-		// analytics and link-interception code.
 		name: "elurls-anchor-stringifier",
 		js: `
 			const a = document.createElement("a");
@@ -166,11 +156,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: these reflected URL properties are not proxied at all,
-		// so they resolve the page's relative URL against the *proxy* document
-		// URL. video.poster hands back the whole /~/sj/… URL; the rest come back
-		// on the proxy origin. formAction in particular decides where a real
-		// form submits.
 		name: "elurls-unproxied-properties",
 		js: `
 			const cases = [
@@ -190,10 +175,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: writing a URL *component* of an anchor goes through the
-		// unproxied setter. `search` is swallowed entirely and `pathname`/`host`
-		// rewrite href into the raw proxy URL. Stripping tracking parameters with
-		// `a.search = …` is a common pattern.
 		name: "elurls-anchor-component-setters",
 		js: `
 			const mk = () => { const a = document.createElement("a"); a.href = "/p/q?x=1#f"; return a; };
@@ -209,9 +190,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: currentSrc reports the proxy URL. This was fixed in
-		// "fix currentsrc leaking proxy url" (#183, c8f0e3f6), which is not in
-		// this branch's history - regression test for that fix.
 		name: "elurls-img-currentsrc",
 		js: `
 			const img = document.createElement("img");
@@ -258,9 +236,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: SVGAnimatedString.baseVal is absolutized instead of
-		// returning the author's string. SVG sprite code reads use.href.baseVal to
-		// find or swap the referenced symbol.
 		name: "elurls-svg-use-baseval",
 		js: `
 			const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");

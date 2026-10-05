@@ -1,10 +1,5 @@
 import { basicTest } from "../../testcommon.ts";
 
-// URL-bearing attributes are stored rewritten with the author's value kept
-// alongside them, so every route that can observe an attribute has to agree:
-// getAttribute, getAttributeNames, attributes, hasAttribute, outerHTML,
-// selector matching, cloning and MutationObserver records.
-
 export default [
 	basicTest({
 		name: "domattr-names-and-serialization",
@@ -16,7 +11,7 @@ export default [
 			assertEqual(img.outerHTML, '<img src="/a.png" class="c">', "outerHTML");
 			assertEqual(img.getAttribute("src"), "/a.png", "getAttribute");
 			assert(img.hasAttribute("src"), "hasAttribute");
-			assert(!img.hasAttribute("scramjet-attr-src"), "no internal attribute is reachable by name");
+			assert(!img.hasAttribute("ramjet-attr-src"), "no internal attribute is reachable by name");
 			img.removeAttribute("src");
 			assertEqual(img.getAttribute("src"), null, "removeAttribute");
 			assertDeepEqual(img.getAttributeNames(), ["class"], "names after removal");
@@ -102,13 +97,7 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
 	basicTest({
-		// KNOWN FAILURE: getAttributeNames(), outerHTML and hasAttribute all
-		// filter the internal bookkeeping attribute, but the `attributes`
-		// NamedNodeMap does not - iterating it exposes scramjet-attr-src.
-		// Attribute mirroring (web components, `[...el.attributes]` copy loops)
-		// carries it straight into the page's own markup.
 		name: "domattr-attributes-namednodemap",
 		js: `
 			const img = document.createElement("img");
@@ -121,11 +110,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: setting a URL property produces two mutation records -
-		// one for the internal attribute and one for the real one. Frameworks
-		// that observe attributes (Stimulus, Alpine, Angular, any
-		// attributeChangedCallback mirror) process the change twice and see an
-		// attributeName they don't recognise.
 		name: "domattr-mutationobserver-records",
 		js: `
 			const img = document.createElement("img");
@@ -143,9 +127,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: the DOM holds the rewritten value, so a selector written
-		// against the author's value never matches. `querySelector('link[href="…"]')`
-		// and `[src="…"]` lookups are everywhere in loader and dedup code.
 		name: "domattr-selector-literal-value",
 		js: `
 			document.body.innerHTML = '<a href="/l1">a</a><img src="/i1.png">';
@@ -155,10 +136,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: the integrity IDL attribute reads back empty even though
-		// the content attribute is kept. Worth noting the deeper problem it hints
-		// at: the attribute survives into the DOM while the script body is
-		// rewritten, so a real subresource-integrity hash can no longer match.
 		name: "domattr-integrity-property",
 		js: `
 			const s = document.createElement("script");
@@ -171,9 +148,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: markup parsed into a shadow root is not rewritten, so
-		// relative URLs resolve against the proxy origin and the resources 404.
-		// The same markup parsed into the light DOM is fine.
 		name: "domattr-shadow-innerhtml-urls",
 		js: `
 			const host = document.createElement("div");

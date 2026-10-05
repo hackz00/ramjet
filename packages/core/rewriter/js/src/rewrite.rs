@@ -22,7 +22,7 @@ pub(crate) enum RewriteType<'alloc: 'data, 'data> {
 	/// `wrapPostMessage(object)`
 	WrapPostMessage,
 
-	// `new Foo()` -> `new (Foo)()`
+
 	WrapNew,
 
 	/// `(cfg.importfn("cfg.base"))`
@@ -42,7 +42,7 @@ pub(crate) enum RewriteType<'alloc: 'data, 'data> {
 		ident: Atom<'data>,
 		tempvar: bool,
 	},
-	// `location` -> `cfg.templocid`
+
 	TempVar,
 
 	WrapObjectAssignment {
@@ -53,7 +53,7 @@ pub(crate) enum RewriteType<'alloc: 'data, 'data> {
 	/// `cfg.wrapprop({})`
 	WrapProperty,
 
-	// dead code only if debug is disabled
+
 	#[allow(dead_code)]
 	/// `$scramerr(name)`
 	ScramErr {
@@ -66,7 +66,7 @@ pub(crate) enum RewriteType<'alloc: 'data, 'data> {
 	Eval {
 		inner: Span,
 	},
-	/// `((t)=>$scramjet$tryset(name,"op",t)||(name op t))(rhs)`
+	/// `((t)=>$ramjet$tryset(name,"op",t)||(name op t))(rhs)`
 	Assignment {
 		name: Atom<'data>,
 		rhs: Span,
@@ -78,7 +78,7 @@ pub(crate) enum RewriteType<'alloc: 'data, 'data> {
 	},
 	SourceTag,
 
-	// ;cfg.cleanrestfn(restids[0]); cfg.cleanrestfn(restid[1]);
+
 	CleanFunction {
 		restids: Vec<Atom<'data>>,
 		expression: bool,
@@ -93,7 +93,7 @@ pub(crate) enum RewriteType<'alloc: 'data, 'data> {
 		declare_local_location: bool,
 	},
 
-	// don't use for anything static, only use for stuff like rewriteurl
+
 	Replace {
 		text: &'alloc str,
 	},

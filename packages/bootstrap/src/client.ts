@@ -3,7 +3,7 @@ import { BootstrapOptions } from "./common";
 import type { ProxyTransport } from "@mercuryworkshop/proxy-transports";
 import type EpoxyClient from "@mercuryworkshop/epoxy-transport";
 import type LibcurlClient from "@mercuryworkshop/libcurl-transport";
-import * as ControllerApi from "@mercuryworkshop/scramjet-controller";
+import * as ControllerApi from "@ramjet/controller";
 
 export async function init(cfg: BootstrapOptions) {
 	const sw = await registerSw(cfg.swPath);
@@ -11,9 +11,9 @@ export async function init(cfg: BootstrapOptions) {
 }
 
 export async function loadRest(sw: ServiceWorker, cfg: BootstrapOptions) {
-	await loadScript(cfg.scramjetBundlePath);
-	await loadScript(cfg.scramjetControllerApiPath);
-	await loadScript(cfg.scramjetUtilsBundlePath);
+	await loadScript(cfg.ramjetBundlePath);
+	await loadScript(cfg.ramjetControllerApiPath);
+	await loadScript(cfg.ramjetUtilsBundlePath);
 
 	const resolvedWispPath = `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}${cfg.wispPath}`;
 
@@ -30,13 +30,12 @@ export async function loadRest(sw: ServiceWorker, cfg: BootstrapOptions) {
 		transport = new LibcurlCtor({ wisp: resolvedWispPath });
 	} else if (cfg.transport === "bare") {
 		throw new Error("Bare transport not implemented yet");
-		//...
 	}
 	const { Controller, config } = (window as any)
-		.$scramjetController as typeof ControllerApi;
-	config.injectPath = cfg.scramjetControllerInjectPath;
-	config.wasmPath = cfg.scramjetWasmPath;
-	config.scramjetPath = cfg.scramjetBundlePath;
+		.$ramjetController as typeof ControllerApi;
+	config.injectPath = cfg.ramjetControllerInjectPath;
+	config.wasmPath = cfg.ramjetWasmPath;
+	config.ramjetPath = cfg.ramjetBundlePath;
 
 	const controller = new Controller({
 		serviceworker: sw,

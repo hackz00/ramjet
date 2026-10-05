@@ -1,8 +1,3 @@
-/**
- * Flags member access and calls on values from ctx.this / ctx.args / ctx.get()
- * inside Proxy apply/construct-style handlers (first parameter name configurable).
- */
-
 function unwrapTS(node) {
 	if (!node) return node;
 	const t = node.type;
@@ -41,7 +36,6 @@ function isCtxIdentifier(node, contextParamNames) {
 	return u.type === "Identifier" && contextParamNames.has(u.name);
 }
 
-/** ctx.this or ctx.args (the expression itself is a foreign-realm handle). */
 function isDirectCtxRealmMember(node, contextParamNames) {
 	const n = unwrapTS(node);
 	if (n.type !== "MemberExpression" || n.optional) return false;
@@ -102,9 +96,6 @@ function isDirectAssignmentTarget(node) {
 	return false;
 }
 
-/**
- * Reads that only branch on truthiness or typeof (no arbitrary property access).
- */
 function isBenignPoisonRead(node) {
 	const parent = node.parent;
 	if (!parent) return false;
@@ -146,7 +137,6 @@ function isBenignPoisonRead(node) {
 	return false;
 }
 
-/** `x === null`, `x !== undefined`, etc. (no property reads on the compared value). */
 function isBenignNullishCompare(node) {
 	const p = node.parent;
 	if (!p || p.type !== "BinaryExpression") return false;
@@ -236,7 +226,7 @@ function isAllowedPoisonSink(
 	node,
 	contextParamNames,
 	snapshotStringNames,
-	isMapLikeObject
+	isMapLikeObject,
 ) {
 	const candidate = getTSExpressionContainer(node);
 	const parent = candidate.parent;
@@ -377,13 +367,12 @@ const poisonedCtxPlugin = {
 					}
 				}
 				const contextParamNames = new Set(
-					context.options[0]?.contextParamNames ?? ["ctx"]
+					context.options[0]?.contextParamNames ?? ["ctx"],
 				);
 				const reported = new WeakSet();
 
-				/** @type {Array<Map<string, boolean>>} */
 				const scopeStack = [];
-				/** @type {Array<Map<string, boolean>>} */
+
 				const mapLikeStack = [];
 				let interceptorDepth = 0;
 
@@ -565,7 +554,7 @@ const poisonedCtxPlugin = {
 								node,
 								contextParamNames,
 								snapshotStringNames,
-								exprIsMapLikeObject
+								exprIsMapLikeObject,
 							)
 						) {
 							return;

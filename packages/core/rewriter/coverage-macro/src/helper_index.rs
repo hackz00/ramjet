@@ -1,11 +1,5 @@
-//! Build a global index of every method in visitor.rs that takes a `&AstNode`
-//! as its first non-self argument. For each, recursively analyze the body to
-//! determine whether it fully covers all R-reaching fields of that node.
-//!
-//! Helpers (`recurse_*`, `handle_*`) get the same treatment as visit_* methods
-//! — if their body provably walks every R-field of their input, they're
-//! recorded as "fully covers". Callers can then credit the corresponding
-//! field at the call site.
+
+
 
 use std::collections::HashMap;
 
@@ -34,9 +28,7 @@ pub struct HelperInfo {
     pub name: String,
     pub args: Vec<HelperArg>,
 
-    // Backward-compat: views over args[0]. These shadow the per-arg fields so
-    // existing call sites that read `info.node_type` / `info.fully_covers` /
-    // `info.covered_set` / `info.covered_all` keep working.
+
     pub node_type: String,
     pub it_param_name: String,
     pub fully_covers: bool,
@@ -94,7 +86,7 @@ pub fn index() -> HelperIndex {
     let Ok(src) = std::fs::read_to_string(&path) else {
         return HelperIndex::default();
     };
-    // Cheap content hash.
+
     let mut hash: u64 = 1469598103934665603;
     for b in src.bytes() {
         hash ^= b as u64;
@@ -133,19 +125,19 @@ fn build_index_from(src: &str) -> HelperIndex {
         }
     }
 
-    // Fixpoint: re-check each helper's full-coverage until stable.
+
     let graph = AstGraph::build();
     loop {
         let mut changed = false;
         let names: Vec<String> = working.keys().cloned().collect();
-        // Snapshot infos for analyze_helper input.
+
         let infos_snapshot: HashMap<String, HelperInfo> = working
             .iter()
             .map(|(k, v)| (k.clone(), v.info.clone()))
             .collect();
         for name in names {
             let w = working.get(&name).unwrap().clone();
-            // Re-analyze each AST-typed arg independently.
+
             let mut new_args = w.info.args.clone();
             let mut any_changed = false;
             for arg_idx in 0..new_args.len() {
@@ -180,7 +172,7 @@ fn locate_visitor_rs() -> Option<String> {
     if let Ok(p) = std::env::var("COVERAGE_VISITOR_FILE") {
         return Some(p);
     }
-    // Default: relative to coverage-macro's CARGO_MANIFEST_DIR.
+
     let dir = env!("CARGO_MANIFEST_DIR");
     Some(format!("{dir}/../js/src/visitor.rs"))
 }
@@ -189,7 +181,7 @@ fn extract_method(f: &syn::ImplItemFn) -> Option<WorkingHelper> {
     let name = f.sig.ident.to_string();
     let mut iter = f.sig.inputs.iter();
     let _recv = iter.next()?;
-    // Collect every &T arg whose T resolves to a known AST type.
+
     let mut args: Vec<HelperArg> = Vec::new();
     let graph = AstGraph::build();
     for (pos, arg) in iter.enumerate() {
@@ -199,7 +191,7 @@ fn extract_method(f: &syn::ImplItemFn) -> Option<WorkingHelper> {
             _ => continue,
         };
         let Some(ast_type) = extract_ref_type_name(ty) else { continue };
-        // Only accept types we know are AST nodes (in our shape table).
+
         if !graph.nodes.contains_key(ast_type.as_str()) {
             continue;
         }
@@ -264,9 +256,7 @@ fn analyze_helper_arg(
     };
 
     let mut origins = OriginMap::new();
-    // Treat the analyzed arg as `it` for this pass. Other AST args get a
-    // best-effort Origin::Unknown so walks on them don't credit the wrong
-    // field.
+
     origins.set_binding(&arg.name, Binding::it(Some(arg.ast_type.clone())));
     for (i, other) in w.info.args.iter().enumerate() {
         if i == arg_idx { continue; }
@@ -279,8 +269,7 @@ fn analyze_helper_arg(
         );
     }
 
-    // Optimistic self-coverage on every arg so recursive helpers don't
-    // pessimize themselves.
+
     let mut optimistic_helpers = helpers.clone();
     if let Some(self_info) = optimistic_helpers.get_mut(&w.info.name) {
         for a in &mut self_info.args {
@@ -298,8 +287,7 @@ fn analyze_helper_arg(
         origins,
     );
 
-    // Compute intersection of covered across all paths (the conservative
-    // "always covered" set).
+
     let mut combined: Option<crate::analyze::Covered> = None;
     for p in &paths {
         combined = Some(match combined {
@@ -309,7 +297,7 @@ fn analyze_helper_arg(
     }
     let combined = combined.unwrap_or(crate::analyze::Covered::empty());
 
-    // Verify fully_covers across all paths.
+
     let mut fully = true;
     for p in &paths {
         let covered_all = p.covered.all;
@@ -322,8 +310,7 @@ fn analyze_helper_arg(
                 break;
             }
         }
-        // For enum node_types (no fields, only variants), fully_covers
-        // requires covered_all (the helper must walk the whole enum).
+
         if def.fields.is_empty() && !def.variants.is_empty() && !covered_all {
             fully = false;
         }
@@ -414,8 +401,7 @@ pub fn resolve_origin(e: &Expr, origins: &OriginMap, it_name: &str) -> Origin {
             Origin::Unknown
         }
         Expr::Field(f) => {
-            // Could be `it.foo`, `it.foo.bar`, or `local.field`.
-            // Trace the base.
+
             let base = resolve_origin(&f.base, origins, it_name);
             match base {
                 Origin::It => {
@@ -429,7 +415,7 @@ pub fn resolve_origin(e: &Expr, origins: &OriginMap, it_name: &str) -> Origin {
         }
         Expr::Index(idx) => resolve_origin(&idx.expr, origins, it_name),
         Expr::MethodCall(m) => {
-            // e.g. `.unwrap()`, `.as_assignment_target()`. Pass through.
+
             resolve_origin(&m.receiver, origins, it_name)
         }
         _ => Origin::Unknown,
@@ -489,8 +475,7 @@ pub fn resolve_type(
 /// for unknown methods so the type tracker degrades to "I don't know" rather
 /// than asserting a wrong type.
 fn method_result_type(recv: Option<&str>, method: &str) -> Option<String> {
-    // Pass-through methods on Option/Result/Box/&T — the inner value type is
-    // the same as the receiver's logical type for our purposes.
+
     let pass_through = [
         "unwrap", "unwrap_or", "unwrap_or_else", "expect", "as_ref", "as_deref",
         "as_mut", "as_deref_mut", "clone", "to_owned",
@@ -498,7 +483,7 @@ fn method_result_type(recv: Option<&str>, method: &str) -> Option<String> {
     if pass_through.contains(&method) {
         return recv.map(String::from);
     }
-    // oxc-specific conversions.
+
     let recv = recv?;
     match (recv, method) {
         ("ForStatementLeft", "as_assignment_target") => Some("AssignmentTarget".into()),
@@ -531,12 +516,7 @@ pub fn iter_element_type(
     it_type: Option<&str>,
     graph: &crate::reachability::AstGraph,
 ) -> Option<String> {
-    // The iter expression's type IS the collection field type (e.g.
-    // BindingProperty for ObjectPattern.properties: Vec<BindingProperty>).
-    // resolve_type peels references and field accesses to give us the inner
-    // type. For Vec/Option fields we registered the *element* type in
-    // ast_table.rs (Cardinality flags carry that). resolve_type already
-    // returns the element type because our table stores `ty` as the element.
+
     resolve_type(iter, origins, it_name, it_type, graph)
 }
 

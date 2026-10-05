@@ -1,12 +1,12 @@
-import { ScramjetClient } from "@client/index";
+import { RamjetClient } from "@client/index";
 import { Object_defineProperty, _URL } from "@/shared/snapshot";
 
-export default function (client: ScramjetClient, self: Self) {
+export default function (client: RamjetClient, self: Self) {
 	const boundimport = client.natives.call(
 		"Function",
 		null,
 		"url",
-		"return import(url)"
+		"return import(url)",
 	);
 
 	Object_defineProperty(self, client.config.globals.importfn, {
@@ -19,10 +19,8 @@ export default function (client: ScramjetClient, self: Self) {
 				url.startsWith(".") ||
 				url.startsWith("..")
 			) {
-				// this is a url
 				return boundimport(client.rewriteUrl(resolved, { isModule: true }));
 			} else {
-				// this is a specifier handled by importmaps
 				return boundimport(url);
 			}
 		},

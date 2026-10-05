@@ -1,10 +1,5 @@
 import { basicTest } from "../../testcommon.ts";
 
-// Coverage for the trusted-types proxy installed by
-// packages/core/src/client/shared/trustedtypes.ts. These tests assume the
-// `trustedTypes` flag is on (the default). The proxy either passes native TT
-// through unchanged (Chromium) or installs a spec-shaped polyfill.
-
 export default [
 	basicTest({
 		name: "trustedtypes-globals-exist",
@@ -74,7 +69,7 @@ export default [
 		name: "trustedtypes-create-policy-basic",
 		js: `
 			const tt = window.trustedTypes;
-			const name = "scramjet-test-basic-" + Math.random().toString(36).slice(2, 10);
+			const name = "ramjet-test-basic-" + Math.random().toString(36).slice(2, 10);
 			const pol = tt.createPolicy(name, {
 				createHTML: (s) => "[" + s + "]",
 				createScript: (s) => "/*" + s + "*/",
@@ -98,30 +93,14 @@ export default [
 			assert(u instanceof window.TrustedScriptURL, "createScriptURL result must be TrustedScriptURL");
 		`,
 	}),
-	// this can actually throw if its enabled in the csp, we dont emulate csp in scramjet
+
 	// https://developer.mozilla.org/en-US/docs/Web/API/TrustedTypePolicyFactory/createPolicy#exceptions
-	/* 
-	basicTest({
-		name: "trustedtypes-policy-duplicate-name-throws",
-		js: `
-			const tt = window.trustedTypes;
-			const name = "scramjet-test-dup-" + Math.random().toString(36).slice(2, 10);
-			tt.createPolicy(name, { createHTML: (s) => s });
-			let threw = false;
-			try {
-				tt.createPolicy(name, { createHTML: (s) => s });
-			} catch (e) {
-				threw = e instanceof TypeError;
-			}
-			assert(threw, "creating policy with duplicate name should throw TypeError");
-		`,
-	}),
-	*/
+
 	basicTest({
 		name: "trustedtypes-policy-missing-callback",
 		js: `
 			const tt = window.trustedTypes;
-			const name = "scramjet-test-miss-" + Math.random().toString(36).slice(2, 10);
+			const name = "ramjet-test-miss-" + Math.random().toString(36).slice(2, 10);
 			// Policy with only createHTML implemented
 			const pol = tt.createPolicy(name, { createHTML: (s) => s });
 
@@ -144,7 +123,7 @@ export default [
 		name: "trustedtypes-policy-callback-receives-original-input",
 		js: `
 			const tt = window.trustedTypes;
-			const name = "scramjet-test-in-" + Math.random().toString(36).slice(2, 10);
+			const name = "ramjet-test-in-" + Math.random().toString(36).slice(2, 10);
 			let captured;
 			let capturedExtras;
 			const pol = tt.createPolicy(name, {
@@ -168,7 +147,7 @@ export default [
 		name: "trustedtypes-policy-coerces-non-string-input",
 		js: `
 			const tt = window.trustedTypes;
-			const name = "scramjet-test-coerce-" + Math.random().toString(36).slice(2, 10);
+			const name = "ramjet-test-coerce-" + Math.random().toString(36).slice(2, 10);
 			let captured;
 			const pol = tt.createPolicy(name, {
 				createHTML: (input) => {
@@ -188,7 +167,7 @@ export default [
 		name: "trustedtypes-is-helpers",
 		js: `
 			const tt = window.trustedTypes;
-			const name = "scramjet-test-is-" + Math.random().toString(36).slice(2, 10);
+			const name = "ramjet-test-is-" + Math.random().toString(36).slice(2, 10);
 			const pol = tt.createPolicy(name, {
 				createHTML: (s) => s,
 				createScript: (s) => s,
@@ -281,7 +260,7 @@ export default [
 		name: "trustedtypes-innerhtml-with-trusted",
 		js: `
 			const tt = window.trustedTypes;
-			const name = "scramjet-test-ih-" + Math.random().toString(36).slice(2, 10);
+			const name = "ramjet-test-ih-" + Math.random().toString(36).slice(2, 10);
 			const pol = tt.createPolicy(name, { createHTML: (s) => s });
 			const html = pol.createHTML("<b>hello</b><i>world</i>");
 			const div = document.createElement("div");
@@ -300,7 +279,7 @@ export default [
 	basicTest({
 		name: "trustedtypes-innerhtml-with-string-still-works",
 		js: `
-			// scramjet strips CSP so a plain string assignment to innerHTML must
+			// ramjet strips CSP so a plain string assignment to innerHTML must
 			// continue to work regardless of whether a default policy exists.
 			const div = document.createElement("div");
 			div.innerHTML = "<span>raw</span>";
@@ -315,7 +294,7 @@ export default [
 		name: "trustedtypes-script-src-with-trusted",
 		js: `
 			const tt = window.trustedTypes;
-			const name = "scramjet-test-sru-" + Math.random().toString(36).slice(2, 10);
+			const name = "ramjet-test-sru-" + Math.random().toString(36).slice(2, 10);
 			const pol = tt.createPolicy(name, {
 				createScriptURL: (s) => s,
 			});
@@ -332,12 +311,12 @@ export default [
 		name: "trustedtypes-script-text-with-trusted",
 		js: `
 			const tt = window.trustedTypes;
-			const name = "scramjet-test-st-" + Math.random().toString(36).slice(2, 10);
+			const name = "ramjet-test-st-" + Math.random().toString(36).slice(2, 10);
 			const pol = tt.createPolicy(name, { createScript: (s) => s });
 			const ts = pol.createScript("var x = 1;");
 			const script = document.createElement("script");
 			script.text = ts;
-			// either the textContent passed through or scramjet rewrote it; either
+			// either the textContent passed through or ramjet rewrote it; either
 			// way we should see the variable name in the resulting text.
 			const out = script.textContent || script.text || "";
 			assert(out.indexOf("x") !== -1,
@@ -349,7 +328,7 @@ export default [
 		name: "trustedtypes-iframe-srcdoc-with-trusted",
 		js: `
 			const tt = window.trustedTypes;
-			const name = "scramjet-test-sd-" + Math.random().toString(36).slice(2, 10);
+			const name = "ramjet-test-sd-" + Math.random().toString(36).slice(2, 10);
 			const pol = tt.createPolicy(name, { createHTML: (s) => s });
 			const doc = pol.createHTML("<!doctype html><html><body><p id='hi'>x</p></body></html>");
 			const iframe = document.createElement("iframe");
@@ -391,7 +370,7 @@ export default [
 		name: "trustedtypes-toString-and-toJSON",
 		js: `
 			const tt = window.trustedTypes;
-			const name = "scramjet-test-ts-" + Math.random().toString(36).slice(2, 10);
+			const name = "ramjet-test-ts-" + Math.random().toString(36).slice(2, 10);
 			const pol = tt.createPolicy(name, {
 				createHTML: (s) => "[" + s + "]",
 			});
@@ -409,8 +388,8 @@ export default [
 		name: "trustedtypes-independent-policies",
 		js: `
 			const tt = window.trustedTypes;
-			const a = "scramjet-test-ind-a-" + Math.random().toString(36).slice(2, 10);
-			const b = "scramjet-test-ind-b-" + Math.random().toString(36).slice(2, 10);
+			const a = "ramjet-test-ind-a-" + Math.random().toString(36).slice(2, 10);
+			const b = "ramjet-test-ind-b-" + Math.random().toString(36).slice(2, 10);
 			const polA = tt.createPolicy(a, { createHTML: (s) => "A:" + s });
 			const polB = tt.createPolicy(b, { createHTML: (s) => "B:" + s });
 			assert(polA !== polB, "distinct policies should be distinct objects");

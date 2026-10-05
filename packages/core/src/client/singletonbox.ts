@@ -1,5 +1,5 @@
 import { IncrementalHtmlRewriter } from "@/shared";
-import { ScramjetClient } from "./client";
+import { RamjetClient } from "./client";
 import { SourceMaps } from "./shared/sourcemaps";
 import {
 	Object_getOwnPropertyNames,
@@ -7,11 +7,11 @@ import {
 } from "@/shared/snapshot";
 
 export class SingletonBox {
-	clients: ScramjetClient[] = [];
-	globals: Map<Self, ScramjetClient> = new Map();
-	documents: Map<Document, ScramjetClient> = new Map();
-	histories: Map<History, ScramjetClient> = new Map();
-	locations: Map<Location, ScramjetClient> = new Map();
+	clients: RamjetClient[] = [];
+	globals: Map<Self, RamjetClient> = new Map();
+	documents: Map<Document, RamjetClient> = new Map();
+	histories: Map<History, RamjetClient> = new Map();
+	locations: Map<Location, RamjetClient> = new Map();
 	writeRewriters = new WeakMap<Document, IncrementalHtmlRewriter>();
 	unproxy = new Map<any, any>();
 
@@ -19,9 +19,9 @@ export class SingletonBox {
 
 	sourcemaps: SourceMaps = {};
 
-	constructor(public ownerclient: ScramjetClient) {}
+	constructor(public ownerclient: RamjetClient) {}
 
-	registerClient(client: ScramjetClient, global: Self) {
+	registerClient(client: RamjetClient, global: Self) {
 		this.clients.push(client);
 		this.globals.set(global, client);
 		this.documents.set(global.document, client);
@@ -44,7 +44,7 @@ export class SingletonBox {
 			return false;
 		}
 		for (const ctor of ctors) {
-			// eslint-disable-next-line scramjet-core/no-instanceof
+			// eslint-disable-next-line ramjet-core/no-instanceof
 			if (obj instanceof ctor) return true;
 		}
 		return false;

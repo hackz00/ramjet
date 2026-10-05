@@ -1,0 +1,143 @@
+name: CI
+
+permissions:
+  contents: read
+
+on:
+  push:
+    paths-ignore: &ignored
+      - ".zed/**"
+      - ".vscode/**"
+      - "README.md"
+      - "docs/**"
+  pull_request:
+    paths-ignore: *ignored
+  workflow_dispatch:
+
+env:
+  WASM_BINDGEN_VERSION: "0.2.105"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Setup rewriter toolchain
+        uses: ./.github/actions/setup-rewriter-toolchain
+        with:
+          wasm-bindgen-version: ${{ env.WASM_BINDGEN_VERSION }}
+          rewriter-path: packages/core/rewriter
+          github-token: ${{ github.token }}
+      - name: Build the rewriter and the packages
+        run: |
+          RELEASE=1 pnpm --filter @ramjet/core rewriter:build
+          pnpm --filter @ramjet/core build
+          pnpm --filter @ramjet/transport-assisted build
+          pnpm --filter @ramjet/assisted-server build
+          pnpm --filter @ramjet/demo build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: |
+            packages/core/dist
+            packages/controller/dist
+            packages/utils/dist
+            packages/transport-assisted/dist
+            packages/assisted-server/dist
+            packages/bootstrap/dist
+            packages/create-proxy-app/dist
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: packages
+      - run: node --test tests/public-files.test.mjs
+      - run: pnpm --filter @ramjet/core exec vitest run
+      - run: pnpm --filter @ramjet/controller exec vitest run
+      - run: pnpm --filter @ramjet/transport-assisted test
+      - run: pnpm --filter @ramjet/assisted-server test
+      - run: pnpm --filter @ramjet/bootstrap exec node --no-warnings --test test/
+      - run: pnpm --filter create-ramjet-app exec node --no-warnings --test test/
+      - run: pnpm --filter @ramjet/bench exec node --no-warnings --test test/
+
+  runway:
+    name: Compatibility suite (${{ matrix.transport }})
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        transport: [libcurl, assisted]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: packages
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: packages/runway
+      - name: Run Runway
+        run: OMIT_WPT=1 RUNWAY_TRANSPORT=${{ matrix.transport }} pnpm test --parallel 4
+        working-directory: packages/runway
+
+  rewriter:
+    name: Rewriter tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "packages/core/rewriter -> target"
+          cache-all-crates: true
+          shared-key: "rewriter"
+      - run: cargo test
+        working-directory: packages/core/rewriter/native
+
+  packages:
+    name: Release installation
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: packages
+      - run: node scripts/make-release.mjs --skip-build
+      - run: node scripts/verify-release.mjs

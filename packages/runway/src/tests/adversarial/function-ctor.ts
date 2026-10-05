@@ -1,11 +1,5 @@
 import { basicTest } from "../../testcommon.ts";
 
-// client/shared/function.ts intercepts the Function constructor, stringifies
-// the function the real constructor produced, rewrites `return <source>` and
-// evaluates that. It's a hot path: Alpine compiles every directive with
-// `new Function`, Vue 2 compiles render functions with it, and lodash/underscore
-// templates and most CSP-unsafe expression evaluators do the same.
-
 export default [
 	basicTest({
 		name: "functionctor-basic",
@@ -87,7 +81,7 @@ export default [
 		js: `
 			const f = new Function("a", "return a + 1");
 			const s = f.toString();
-			assert(!s.includes("scramjet"), "must not stringify to rewritten source: " + s);
+			assert(!s.includes("ramjet"), "must not stringify to rewritten source: " + s);
 			assert(s.includes("return a + 1"), "the body must round trip: " + s);
 			assert(s.startsWith("function anonymous"), "shape: " + s);
 		`,
@@ -137,14 +131,7 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
-	// the .constructor route into the Function family
-	// ------------------------------------------------------------------
 	basicTest({
-		// KNOWN FAILURE: the global Function is replaced by one proxy and
-		// Function.prototype.constructor by a different one, so the two are no
-		// longer the same object. `x.constructor === Function` is a standard
-		// type test (lodash, jQuery, Angular DI all use some variant).
 		name: "functionctor-prototype-constructor-identity",
 		js: `
 			assertEqual((function () {}).constructor, Function, "Function.prototype.constructor === Function");
@@ -153,10 +140,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: for the async/generator constructors the interceptor
-		// evaluates `return <source>` *inside a function of the same flavor*, so
-		// what comes back is a Promise (or a generator) that wraps the function
-		// instead of the function itself.
 		name: "functionctor-async-flavor",
 		js: `
 			const AsyncFunction = (async function () {}).constructor;
@@ -166,7 +149,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE
 		name: "functionctor-generator-flavor",
 		js: `
 			const GeneratorFunction = (function* () {}).constructor;
@@ -176,7 +158,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE
 		name: "functionctor-asyncgenerator-flavor",
 		js: `
 			const AsyncGeneratorFunction = (async function* () {}).constructor;

@@ -1,13 +1,5 @@
 import { serverTest } from "../../testcommon.ts";
 
-// Response headers the proxy has to actively handle rather than pass through:
-// multiple Set-Cookie headers (folding them into one is a classic proxy bug),
-// conditional revalidation, and the framing headers that would otherwise stop a
-// proxied page from rendering inside a frame at all.
-//
-// Nothing here diverges - this is regression cover for behaviour whole sites
-// depend on.
-
 export default [
 	serverTest({
 		name: "respheaders-multiple-set-cookie",
@@ -95,14 +87,9 @@ export default [
 		},
 	}),
 	serverTest({
-		// A site that refuses to be framed still has to render inside the proxy's
-		// frame, so these headers must be neutralised; if that regresses, every
-		// site setting them goes blank. Applied to a subframe because serverTest
-		// owns the "/" response. scramjetOnly: unproxied, the frame is genuinely
-		// blocked, which is the point.
 		name: "respheaders-framing-headers-neutralised",
 		autoPass: true,
-		scramjetOnly: true,
+		ramjetOnly: true,
 		js: `
 			const f = document.createElement("iframe");
 			f.src = "/framed.html";
@@ -129,11 +116,9 @@ export default [
 		},
 	}),
 	serverTest({
-		// A strict CSP must not stop the proxy's rewritten code from running, and
-		// the site's own subresources must still load under it.
 		name: "respheaders-strict-csp",
 		autoPass: true,
-		scramjetOnly: true,
+		ramjetOnly: true,
 		js: `
 			const f = document.createElement("iframe");
 			f.src = "/csp.html";
@@ -157,7 +142,7 @@ export default [
 					});
 					res.end(
 						'<!DOCTYPE html><html><body><h1>csp</h1><script src="/cspscript.js"></' +
-							"script></body></html>"
+							"script></body></html>",
 					);
 					return;
 				}

@@ -1,20 +1,12 @@
-/**
- * Version information for the current Scramjet build.
- * Contains both the semantic version string and the git commit hash for build identification.
- */
-export interface ScramjetVersionInfo {
-	/** The semantic version */
+export interface RamjetVersionInfo {
 	version: string;
-	/** The git commit hash that this build was created from */
+
 	build: string;
-	/** The date of the build */
+
 	date: string;
 }
 
-/**
- * Scramjet Feature Flags, configured at build time
- */
-export type ScramjetFlags = {
+export type RamjetFlags = {
 	syncxhr: boolean;
 	disableComputedWrap: boolean;
 	rewriterLogs: boolean;
@@ -30,7 +22,7 @@ export type ScramjetFlags = {
 	encapsulateWorkers: boolean;
 };
 
-export interface ScramjetConfig {
+export interface RamjetConfig {
 	globals: {
 		wrapfn: string;
 		wrappropertybase: string;
@@ -45,17 +37,14 @@ export interface ScramjetConfig {
 		templocid: string;
 		tempunusedid: string;
 	};
-	flags: ScramjetFlags;
-	siteFlags: Record<string, Partial<ScramjetFlags>>;
+	flags: RamjetFlags;
+	siteFlags: Record<string, Partial<RamjetFlags>>;
 	maskedfiles: string[];
 }
 
-/**
- * The config for Scramjet initialization.
- */
-export interface ScramjetInitConfig
-	extends Omit<ScramjetConfig, "codec" | "flags"> {
-	flags: Partial<ScramjetFlags>;
+export interface RamjetInitConfig
+	extends Omit<RamjetConfig, "codec" | "flags"> {
+	flags: Partial<RamjetFlags>;
 	codec: {
 		encode: (url: string) => string;
 		decode: (url: string) => string;

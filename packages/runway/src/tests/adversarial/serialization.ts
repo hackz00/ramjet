@@ -1,11 +1,5 @@
 import { basicTest } from "../../testcommon.ts";
 
-// innerHTML/outerHTML un-rewrite URLs and hide the internal bookkeeping
-// attribute. Every other way of turning a node back into a string has to do the
-// same - XMLSerializer especially, which is how charting libraries export SVG,
-// how XML-based APIs build payloads, and how several sanitizers round-trip
-// markup.
-
 export default [
 	basicTest({
 		name: "serialization-domparser",
@@ -15,7 +9,7 @@ export default [
 			assertEqual(doc.querySelector("a").getAttribute("href"), "/x", "parsed attribute");
 			assertEqual(doc.body.innerHTML, '<a href="/x">y</a><img src="/i.png">', "innerHTML round trip");
 			assertEqual(doc.querySelector("a").href, location.origin + "/x", "resolved property");
-			assert(!doc.body.innerHTML.includes("scramjet-attr"), "no internal attribute in innerHTML");
+			assert(!doc.body.innerHTML.includes("ramjet-attr"), "no internal attribute in innerHTML");
 		`,
 	}),
 	basicTest({
@@ -41,7 +35,7 @@ export default [
 			d.innerHTML = '<a href="/x"><img src="/i.png"></a>';
 			assertEqual(d.outerHTML, '<div><a href="/x"><img src="/i.png"></a></div>', "outerHTML");
 			assertEqual(d.innerHTML, '<a href="/x"><img src="/i.png"></a>', "innerHTML");
-			assert(!d.outerHTML.includes("scramjet-attr"), "no internal attribute");
+			assert(!d.outerHTML.includes("ramjet-attr"), "no internal attribute");
 			const wrapper = document.createElement("section");
 			wrapper.appendChild(d);
 			assertEqual(wrapper.innerHTML, '<div><a href="/x"><img src="/i.png"></a></div>', "nested serialization");
@@ -82,35 +76,28 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
 	basicTest({
-		// KNOWN FAILURE: serializeToString bypasses the un-rewriting that
-		// innerHTML/outerHTML do, exposing both the proxy URL and the internal
-		// scramjet-attr-* bookkeeping attribute.
 		name: "serialization-xmlserializer-live",
 		js: `
 			const a = document.createElement("a");
 			a.href = "/x";
 			const s = new XMLSerializer().serializeToString(a);
 			assert(!s.includes("/~/sj/"), "serializeToString must not expose the proxy URL: " + s);
-			assert(!s.includes("scramjet-attr"), "nor the internal attribute: " + s);
+			assert(!s.includes("ramjet-attr"), "nor the internal attribute: " + s);
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: same for parsed documents and for SVG, which is the case
-		// that matters most - exporting a chart with
-		// serializeToString(svgElement) is the standard recipe.
 		name: "serialization-xmlserializer-parsed-and-svg",
 		js: `
 			const doc = new DOMParser().parseFromString('<html><body><a href="/x">y</a></body></html>', "text/html");
 			const s = new XMLSerializer().serializeToString(doc.querySelector("a"));
 			assert(!s.includes("/~/sj/"), "parsed markup: " + s);
-			assert(!s.includes("scramjet-attr"), "parsed markup internal attribute: " + s);
+			assert(!s.includes("ramjet-attr"), "parsed markup internal attribute: " + s);
 			const image = document.createElementNS("http://www.w3.org/2000/svg", "image");
 			image.setAttribute("href", "/s.png");
 			const svg = new XMLSerializer().serializeToString(image);
 			assert(!svg.includes("/~/sj/"), "svg: " + svg);
-			assert(!svg.includes("scramjet-attr"), "svg internal attribute: " + svg);
+			assert(!svg.includes("ramjet-attr"), "svg internal attribute: " + svg);
 		`,
 	}),
 ];

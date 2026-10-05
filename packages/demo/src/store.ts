@@ -1,32 +1,62 @@
 import { createStore } from "dreamland/core";
 
-export type AvailableTransports = "libcurl" | "epoxy";
+export type AvailableTransports = "assisted" | "libcurl" | "epoxy";
 
 export const AVAILABLE_TRANSPORTS: ReadonlyArray<{
 	value: AvailableTransports;
 	label: string;
 }> = [
-	{ value: "libcurl", label: "Libcurl" },
+	{ value: "assisted", label: "Assisted (fastest, server can read traffic)" },
+	{ value: "libcurl", label: "Libcurl (end-to-end encrypted)" },
 	{ value: "epoxy", label: "Epoxy" },
 ];
-const DEFAULT_WISP_URL = import.meta.env.VITE_WISP_URL;
-const DEFAULT_TRANSPORT: AvailableTransports = "libcurl";
-const DEFAULT_HOME_URL = "https://google.com";
+const localHost = ["localhost", "127.0.0.1", "[::1]"].includes(
+	location.hostname,
+);
+const websocketOrigin = `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}`;
+const DEFAULT_WISP_URL =
+	import.meta.env.VITE_WISP_URL ||
+	(localHost ? "ws://localhost:4142/" : `${websocketOrigin}/wisp/`);
+const DEFAULT_ASSISTED_URL =
+	import.meta.env.VITE_ASSISTED_URL ||
+	(localHost ? "ws://localhost:4143/assisted" : `${websocketOrigin}/assisted`);
+const DEFAULT_TRANSPORT: AvailableTransports = "assisted";
+const DEFAULT_HOME_URL = "https://duckduckgo.com/";
 const DEFAULT_MAX_REQUESTS = 200;
 
 export const demoSettingsStore = createStore(
 	{
 		transport: DEFAULT_TRANSPORT as AvailableTransports,
 		wispUrl: DEFAULT_WISP_URL,
+		assistedUrl: DEFAULT_ASSISTED_URL,
 		homeUrl: DEFAULT_HOME_URL,
 		maxRequests: DEFAULT_MAX_REQUESTS,
 	},
 	{
-		ident: "scramjet-demo-settings",
+		ident: "ramjet-demo-settings",
 		backing: "localstorage",
 		autosave: "auto",
-	}
+	},
 );
+
+demoSettingsStore.wispUrl ??= DEFAULT_WISP_URL;
+demoSettingsStore.assistedUrl ??= DEFAULT_ASSISTED_URL;
+
+export function normalizeAssistedUrl(value: string) {
+	const trimmed = value.trim();
+	if (!trimmed) throw new TypeError("Assisted server URL is required.");
+	const parsed = new URL(trimmed);
+	if (!["ws:", "wss:"].includes(parsed.protocol)) {
+		throw new TypeError("Assisted server URL must use ws:// or wss://.");
+	}
+	if (parsed.username || parsed.password) {
+		throw new TypeError(
+			"Assisted server URL cannot contain login credentials.",
+		);
+	}
+	if (parsed.pathname === "/") parsed.pathname = "/assisted";
+	return parsed.toString();
+}
 
 export function normalizeWispUrl(value: string) {
 	const trimmed = value.trim();
@@ -86,6 +116,7 @@ export function normalizeMaxRequests(value: string | number) {
 
 export const demoSettingsDefaults = {
 	wispUrl: normalizeWispUrl(DEFAULT_WISP_URL),
+	assistedUrl: normalizeAssistedUrl(DEFAULT_ASSISTED_URL),
 	transport: DEFAULT_TRANSPORT,
 	homeUrl: normalizeHomeUrl(DEFAULT_HOME_URL),
 	maxRequests: DEFAULT_MAX_REQUESTS,

@@ -66,7 +66,7 @@ impl UrlRewriter for WasmUrlRewriter {
 			.ok_or_else(|| RewriterError::not_str("url rewriter output"))?;
 
 		if module {
-			// TODO: keep this in sync with QP.isModule or find a way to make this use the real rewriteUrl function
+
 			let origin = Url::new(&flags.base).map_err(RewriterError::from)?.origin();
 			let encoded_origin: String = encode_uri_component(&origin).into();
 			rewritten.push_str("?%24module=module&%24io=");
@@ -89,7 +89,7 @@ pub fn get_url_rewriter(func: Object) -> Result<WasmUrlRewriter> {
 	Ok(WasmUrlRewriter(
 		func
 			.dyn_into()
-			.map_err(|_| RewriterError::not_fn("scramjet.codec.encode"))?,
+			.map_err(|_| RewriterError::not_fn("ramjet.codec.encode"))?,
 	))
 }
 

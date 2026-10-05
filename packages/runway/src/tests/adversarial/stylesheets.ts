@@ -1,12 +1,5 @@
 import { serverTest } from "../../testcommon.ts";
 
-// Stylesheet loading end to end, plus the CSSOM views onto it: document
-// .styleSheets, @import chains, constructable stylesheets (what every
-// web-component library uses), FontFace and custom properties.
-//
-// tests/rewriter-css.ts covers the CSS rewriter itself; this covers what a page
-// can observe after a sheet has actually loaded and applied.
-
 const FILES: Record<string, string> = {
 	"/s.css": `@import "/imported.css";\n.styled { color: rgb(1, 2, 3); background-image: url(/bg.png); }`,
 	"/imported.css": `.imported { color: rgb(4, 5, 6); }`,
@@ -57,7 +50,7 @@ export default [
 			i.className = "imported";
 			document.body.appendChild(i);
 			assertEqual(getComputedStyle(i).color, "rgb(4, 5, 6)", "@import inside it applied too");
-		`
+		`,
 	),
 	cssTest(
 		"stylesheets-link-element-urls",
@@ -70,7 +63,7 @@ export default [
 			const sheet = [...document.styleSheets].find((s) => (s.href || "").includes("s.css"));
 			assert(sheet, "the sheet appears in document.styleSheets");
 			assert(sheet.cssRules.length >= 1, "cssRules are readable");
-		`
+		`,
 	),
 	cssTest(
 		"stylesheets-constructable-applies",
@@ -85,7 +78,7 @@ export default [
 			assertEqual(sheet.cssRules.length, 1, "cssRules");
 			await sheet.replace(".ctor { color: rgb(9, 9, 9); }");
 			assertEqual(getComputedStyle(d).color, "rgb(9, 9, 9)", "replace() updates it");
-		`
+		`,
 	),
 	cssTest(
 		"stylesheets-adopted-in-shadow-root",
@@ -100,7 +93,7 @@ export default [
 			d.className = "sh";
 			root.appendChild(d);
 			assertEqual(getComputedStyle(d).color, "rgb(10, 11, 12)", "adoptedStyleSheets in a shadow root");
-		`
+		`,
 	),
 	cssTest(
 		"stylesheets-fontface",
@@ -114,7 +107,7 @@ export default [
 			document.body.appendChild(d);
 			assertEqual(getComputedStyle(d).fontFamily, "probefont", "font-family round trip");
 			assertEqual(typeof document.fonts.ready, "object", "document.fonts.ready");
-		`
+		`,
 	),
 	cssTest(
 		"stylesheets-custom-properties",
@@ -127,14 +120,10 @@ export default [
 			assertEqual(getComputedStyle(d).getPropertyValue("--probe-var").trim(), "42px", "computed custom property");
 			assertEqual(getComputedStyle(d).width, "42px", "var() resolved");
 			assertEqual(d.getAttribute("style"), "--probe-var: 42px; width: var(--probe-var);", "style attribute");
-		`
+		`,
 	),
 
-	// ------------------------------------------------------------------
 	cssTest(
-		// KNOWN FAILURE: styleSheets[].href is the full proxy URL even though
-		// link.href is correct. Font loaders, CSS-in-JS runtimes and "have I
-		// already injected this sheet" checks all read it.
 		"stylesheets-document-stylesheets-href",
 		`
 			${LINK}
@@ -149,13 +138,9 @@ export default [
 				assert(!imported.styleSheet.href.includes("/~/sj/"),
 					"the imported sheet's href leaks: " + imported.styleSheet.href);
 			}
-		`
+		`,
 	),
 	cssTest(
-		// KNOWN FAILURE: a url() written through a constructable stylesheet is
-		// rewritten going in (it loads) but not un-rewritten coming back out, so
-		// the computed value is the proxy URL. This is the path every
-		// web-component library takes (Lit's static styles / adoptedStyleSheets).
 		"stylesheets-constructable-url-readback",
 		`
 			const sheet = new CSSStyleSheet();
@@ -168,6 +153,6 @@ export default [
 			assert(!bg.includes("/~/sj/"), "the computed background must not expose the proxy URL: " + bg);
 			assertEqual(bg, 'url("' + location.origin + '/cbg.png")', "computed background");
 			assert(!sheet.cssRules[0].cssText.includes("/~/sj/"), "cssText leaks: " + sheet.cssRules[0].cssText);
-		`
+		`,
 	),
 ];

@@ -1,5 +1,5 @@
 name: "Setup Rust Rewriter Toolchain"
-description: "Setup Rust toolchain with wasm-bindgen, binaryen, and wasm-snip for building the scramjet rewriter"
+description: "Setup Rust toolchain with wasm-bindgen, binaryen, and wasm-snip for building the Ramjet rewriter"
 
 inputs:
   wasm-bindgen-version:

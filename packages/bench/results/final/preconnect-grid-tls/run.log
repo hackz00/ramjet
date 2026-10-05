@@ -1,0 +1,32 @@
+run 1/15 current+assisted grid: cold fcp=333 load=618
+run 1/15 current+assisted+nopreconnect grid: cold fcp=296 load=607
+run 2/15 current+assisted grid: cold fcp=309 load=610
+run 2/15 current+assisted+nopreconnect grid: cold fcp=308 load=609
+run 3/15 current+assisted grid: cold fcp=312 load=598
+run 3/15 current+assisted+nopreconnect grid: cold fcp=300 load=611
+run 4/15 current+assisted grid: cold fcp=308 load=620
+run 4/15 current+assisted+nopreconnect grid: cold fcp=305 load=600
+run 5/15 current+assisted grid: cold fcp=308 load=627
+run 5/15 current+assisted+nopreconnect grid: cold fcp=304 load=617
+run 6/15 current+assisted grid: cold fcp=317 load=637
+run 6/15 current+assisted+nopreconnect grid: cold fcp=308 load=606
+run 7/15 current+assisted grid: cold fcp=301 load=587
+run 7/15 current+assisted+nopreconnect grid: cold fcp=297 load=584
+run 8/15 current+assisted grid: cold fcp=312 load=593
+run 8/15 current+assisted+nopreconnect grid: cold fcp=300 load=584
+run 9/15 current+assisted grid: cold fcp=304 load=612
+run 9/15 current+assisted+nopreconnect grid: cold fcp=296 load=582
+run 10/15 current+assisted grid: cold fcp=308 load=594
+run 10/15 current+assisted+nopreconnect grid: cold fcp=309 load=608
+run 11/15 current+assisted grid: cold fcp=300 load=589
+run 11/15 current+assisted+nopreconnect grid: cold fcp=305 load=610
+run 12/15 current+assisted grid: cold fcp=304 load=586
+run 12/15 current+assisted+nopreconnect grid: cold fcp=305 load=598
+run 13/15 current+assisted grid: cold fcp=316 load=601
+run 13/15 current+assisted+nopreconnect grid: cold fcp=296 load=602
+run 14/15 current+assisted grid: cold fcp=308 load=602
+run 14/15 current+assisted+nopreconnect grid: cold fcp=313 load=598
+run 15/15 current+assisted grid: cold fcp=308 load=594
+run 15/15 current+assisted+nopreconnect grid: cold fcp=296 load=580
+wrote <repo>\packages\bench\results\current+assisted-typical-cpu1.json
+wrote <repo>\packages\bench\results\current+assisted+nopreconnect-typical-cpu1.json

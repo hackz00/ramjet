@@ -114,7 +114,7 @@ function runLengthTest(scenario, urlLength, expectation, testDescription) {
 
 function TestCase(scenarios, sanityChecker) {
 	function shouldSkipScenario(scenario) {
-		// Scramjet currently treats pages as secure contexts, so the imported WPT
+		// Ramjet currently treats pages as secure contexts, so the imported WPT
 		// cases that rely on explicit HTTPS destinations or downgrade behavior
 		// don't produce meaningful results yet.
 		return (

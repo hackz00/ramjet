@@ -1,39 +1,34 @@
 import { iswindow } from "@client/entry";
-import { SCRAMJETCLIENT } from "@/symbols";
-import { ScramjetClient } from "@client/index";
-// import { argdbg } from "@client/shared/err";
+import { RAMJETCLIENT } from "@/symbols";
+import { RamjetClient } from "@client/index";
+
 import { Object_defineProperty } from "@/shared/snapshot";
 
-export function createWrapFn(client: ScramjetClient, self: GlobalThis) {
+export function createWrapFn(client: RamjetClient, self: GlobalThis) {
 	let wrappedParent: GlobalThis | null = null;
 	let wrappedTop: GlobalThis | null = null;
 	if (iswindow) {
 		try {
-			if (SCRAMJETCLIENT in self.parent) {
-				// ... then we're in a subframe, and the parent frame is also in a proxy context, so we should return its proxy
-				wrappedParent = self.parent;
+			if (RAMJETCLIENT in self.parent) {
+				wrappedParent = self.parent as Self;
 			} else {
-				// ... then we should pretend we aren't nested and return the current window
 				wrappedParent = self;
 			}
 		} catch {
-			// accessing self.parent can throw if it's cross-origin, in which case we should also pretend we aren't nested
 			wrappedParent = self;
 		}
-		// instead of returning top, we need to return the uppermost parent that's inside a scramjet context
+
 		let current = self;
 		for (;;) {
 			const test = current.parent.self;
-			if (test === current) break; // there is no parent, actual or emulated.
+			if (test === current) break;
 
 			try {
-				// ... then `test` represents a window outside of the proxy context, and therefore `current` is the topmost window in the proxy context
-				if (!(SCRAMJETCLIENT in test)) break;
+				if (!(RAMJETCLIENT in test)) break;
 			} catch {
-				// accessing test can throw if it's cross-origin, in which case we should also break
 				break;
 			}
-			// test is also insde a proxy, so we should continue up the chain
+
 			current = test;
 		}
 		wrappedTop = current;
@@ -56,7 +51,7 @@ export function createWrapFn(client: ScramjetClient, self: GlobalThis) {
 }
 
 export const order = 4;
-export default function (client: ScramjetClient, self: GlobalThis) {
+export default function (client: RamjetClient, self: GlobalThis) {
 	Object_defineProperty(self, client.config.globals.wrapfn, {
 		value: client.wrapfn,
 		writable: false,
@@ -80,9 +75,7 @@ export default function (client: ScramjetClient, self: GlobalThis) {
 		enumerable: false,
 	});
 	Object_defineProperty(self, client.config.globals.cleanrestfn, {
-		value: function (obj) {
-			// TODO
-		},
+		value: function (obj) {},
 		writable: false,
 		configurable: false,
 		enumerable: false,
@@ -93,8 +86,6 @@ export default function (client: ScramjetClient, self: GlobalThis) {
 		client.config.globals.wrappropertybase + "location",
 		{
 			get: function () {
-				// if (this.location.constructor.toString().includes("Location")) {
-
 				if (this === self || this === self.document) {
 					return client.locationProxy;
 				}
@@ -111,7 +102,7 @@ export default function (client: ScramjetClient, self: GlobalThis) {
 			},
 			configurable: false,
 			enumerable: false,
-		}
+		},
 	);
 	Object_defineProperty(
 		self.Object.prototype,
@@ -121,12 +112,11 @@ export default function (client: ScramjetClient, self: GlobalThis) {
 				return client.wrapfn(this.parent);
 			},
 			set(value: any) {
-				// i guess??
 				this.parent = value;
 			},
 			configurable: false,
 			enumerable: false,
-		}
+		},
 	);
 	Object_defineProperty(
 		self.Object.prototype,
@@ -140,7 +130,7 @@ export default function (client: ScramjetClient, self: GlobalThis) {
 			},
 			configurable: false,
 			enumerable: false,
-		}
+		},
 	);
 	Object_defineProperty(
 		self.Object.prototype,
@@ -154,7 +144,7 @@ export default function (client: ScramjetClient, self: GlobalThis) {
 			},
 			configurable: false,
 			enumerable: false,
-		}
+		},
 	);
 
 	self.$scramitize = function (v) {
@@ -162,11 +152,10 @@ export default function (client: ScramjetClient, self: GlobalThis) {
 		if (t === "object" && v !== null) {
 			if (v === location) debugger;
 			if (iswindow) {
-				// if (v === self.parent) debugger;
 				if (v === self.top) debugger;
 			}
 		} else if (t === "string") {
-			if (v.includes("scramjet")) debugger;
+			if (v.includes("ramjet")) debugger;
 			if (v.includes("~/sj")) debugger;
 			if (v.includes(location.origin)) debugger;
 		}
@@ -174,10 +163,6 @@ export default function (client: ScramjetClient, self: GlobalThis) {
 		return v;
 	};
 
-	// location = "..." can't be rewritten as wrapfn(location) = ..., so instead it will actually be rewritten as
-	// ((t)=>$scramjet$tryset(location,"+=",t)||location+=t)(...);
-	// it has to be a discrete function because there's always the possibility that "location" is a local variable
-	// we have to use an IIFE to avoid duplicating side-effects in the getter
 	Object_defineProperty(self, client.config.globals.trysetfn, {
 		value: function (lhs: any, op: string, rhs: any) {
 			if (client.box.locations.has(lhs)) {

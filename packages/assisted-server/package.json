@@ -1,0 +1,46 @@
+{
+	"name": "@ramjet/assisted-server",
+	"version": "0.1.0",
+	"type": "module",
+	"description": "Server half of the Ramjet assisted transport: fetches on behalf of the browser over one WebSocket",
+	"scripts": {
+		"start": "node --no-warnings src/cli.ts",
+		"test": "node --no-warnings --test test/",
+		"build": "esbuild src/cli.ts --bundle --platform=node --format=esm --target=node22 --external:undici --external:ws --banner:js=\"#!/usr/bin/env node\" --outfile=dist/cli.mjs && esbuild src/server.ts --bundle --platform=node --format=esm --target=node22 --external:undici --external:ws --outfile=dist/server.mjs",
+		"prepack": "pnpm build"
+	},
+	"license": "AGPL-3.0-only",
+	"dependencies": {
+		"undici": "^8.11.2",
+		"ws": "^8.22.0"
+	},
+	"bin": {
+		"ramjet-assisted-server": "./dist/cli.mjs"
+	},
+	"main": "./dist/server.mjs",
+	"exports": {
+		".": "./dist/server.mjs"
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"engines": {
+		"node": ">=22.19.0"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"devDependencies": {
+		"esbuild": "^0.28.2"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/hackz00/ramjet.git",
+		"directory": "packages/assisted-server"
+	},
+	"homepage": "https://github.com/hackz00/ramjet#readme",
+	"bugs": {
+		"url": "https://github.com/hackz00/ramjet/issues"
+	}
+}

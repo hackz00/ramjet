@@ -8,7 +8,7 @@ import noGlobalsPlugin from "./tools/eslint/no-globals-plugin.mjs";
 import noInstanceofPlugin from "./tools/eslint/no-instanceof-plugin.mjs";
 import poisonedCtxPlugin from "./tools/eslint/poisoned-ctx-plugin.mjs";
 
-const scramjetCorePlugin = {
+const ramjetCorePlugin = {
 	rules: {
 		...noGlobalsPlugin.rules,
 		...noInstanceofPlugin.rules,
@@ -77,28 +77,28 @@ export default [
 	{
 		files: ["src/**/*.ts"],
 		plugins: {
-			"scramjet-core": scramjetCorePlugin,
+			"ramjet-core": ramjetCorePlugin,
 		},
 		rules: {
-			"scramjet-core/no-globals": [
+			"ramjet-core/no-globals": [
 				"error",
 				{
 					allow: ["BUILDDATE", "COMMITHASH", "dbg", "setTimeout", "VERSION"],
 				},
 			],
-			"scramjet-core/no-instanceof": "error",
+			"ramjet-core/no-instanceof": "error",
 		},
 	},
 	{
 		files: ["src/shared/snapshot.ts"],
 		rules: {
-			"scramjet-core/no-globals": ["off"],
+			"ramjet-core/no-globals": ["off"],
 		},
 	},
 	{
 		files: ["src/client/**/*.ts"],
 		rules: {
-			"scramjet-core/no-poisoned-ctx-value": "warn",
+			"ramjet-core/no-poisoned-ctx-value": "warn",
 		},
 	},
 ];

@@ -16,3 +16,10 @@ coverage-macro = { version = "0.1.0", path = "../coverage-macro" }
 [features]
 default = ["debug"]
 debug = ["transform/debug"]
+
+[dev-dependencies]
+criterion = { version = "0.5", default-features = false }
+
+[[bench]]
+name = "rewrite"
+harness = false

@@ -8,7 +8,6 @@ function isValueReference(reference) {
 	return true;
 }
 
-/** TS lib globals (e.g. DataView) are ImplicitLibVariable with own isValueVariable; ordinary Variable uses getters. */
 function isImplicitLibVariable(variable) {
 	return Object.hasOwn(variable, "isValueVariable");
 }
@@ -44,7 +43,7 @@ const noGlobalsPlugin = {
 				],
 				messages: {
 					unexpectedGlobal:
-						"Do not use runtime global '{{name}}'. Access it through scramjet wrappers instead.",
+						"Do not use runtime global '{{name}}'. Access it through ramjet wrappers instead.",
 				},
 			},
 			create(context) {
@@ -90,8 +89,6 @@ const noGlobalsPlugin = {
 								continue;
 							}
 
-							// TS lib can mark names as type-only (isValueVariable false) after later lib
-							// layers override; value uses still resolve here and must be flagged.
 							for (const reference of variable.references) {
 								if (!isValueReference(reference)) {
 									continue;
@@ -101,8 +98,6 @@ const noGlobalsPlugin = {
 							}
 						}
 
-						// `globalThis` resolves as a normal env global, not a TS ImplicitLibVariable,
-						// so it is not covered by the loops above.
 						const globalThisVar =
 							globalScope.set?.get("globalThis") ??
 							globalScope.variables.find((v) => v.name === "globalThis");

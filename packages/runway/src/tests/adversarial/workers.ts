@@ -1,10 +1,5 @@
 import { serverTest } from "../../testcommon.ts";
 
-// A worker gets its own scramjet client with iswindow === false, its own
-// location, and its own URL base for fetch/XHR/importScripts. Sites lean on
-// workers for anything expensive - PDF.js, monaco, wasm runtimes, analytics
-// batching - and bundlers emit module workers by default.
-
 const workerTest = (name: string, js: string) =>
 	serverTest({
 		name,
@@ -83,7 +78,6 @@ const workerTest = (name: string, js: string) =>
 		},
 	});
 
-// wait for one message, failing loudly on worker errors
 const ASK = `
 	const ask = (w, msg) => new Promise((res, rej) => {
 		const errors = [];
@@ -111,7 +105,7 @@ export default [
 			assertEqual(d.hasWindow, false, "no window in a worker");
 			assertEqual(d.ua, "string", "navigator.userAgent");
 			w.terminate();
-		`
+		`,
 	),
 	workerTest(
 		"workers-structured-clone",
@@ -131,7 +125,7 @@ export default [
 			assertEqual(d.got.dt instanceof Date, true, "Date survived");
 			assertEqual(d.got.buf instanceof Uint8Array, true, "typed array survived");
 			w.terminate();
-		`
+		`,
 	),
 	workerTest(
 		"workers-fetch-and-xhr-inside",
@@ -145,7 +139,7 @@ export default [
 			assertEqual(d.xhrUrl, location.origin + "/echo", "xhr.responseURL inside a worker");
 			assertEqual(d.xhrStatus, 200, "xhr status");
 			w.terminate();
-		`
+		`,
 	),
 	workerTest(
 		"workers-importscripts",
@@ -156,7 +150,7 @@ export default [
 			assertEqual(d.kind, "ok", "worker ran: " + JSON.stringify(d));
 			assertEqual(d.lib, "fromlib", "importScripts loaded and ran the library");
 			w.terminate();
-		`
+		`,
 	),
 	workerTest(
 		"workers-module-without-imports",
@@ -167,7 +161,7 @@ export default [
 			assertEqual(d.kind, "ok", "module worker ran: " + JSON.stringify(d));
 			assertEqual(d.metaUrl, location.origin + "/wmod.js", "import.meta.url in a module worker");
 			w.terminate();
-		`
+		`,
 	),
 	workerTest(
 		"workers-url-argument",
@@ -178,7 +172,7 @@ export default [
 			assertEqual(d.kind, "ok", "new Worker(URL) works");
 			assertEqual(d.href, location.origin + "/w.js", "resolved URL");
 			w.terminate();
-		`
+		`,
 	),
 	workerTest(
 		"workers-error-event",
@@ -192,7 +186,7 @@ export default [
 			assert(!(e.filename || "").includes("/~/sj/"), "error filename must not expose the proxy URL: " + e.filename);
 			assertEqual(e.filename, location.origin + "/wthrow.js", "error filename");
 			w.terminate();
-		`
+		`,
 	),
 	workerTest(
 		"workers-terminate",
@@ -206,14 +200,10 @@ export default [
 			w.postMessage("after-terminate");
 			await new Promise((r) => setTimeout(r, 300));
 			assertEqual(replied, false, "a terminated worker stops replying");
-		`
+		`,
 	),
 
-	// ------------------------------------------------------------------
 	workerTest(
-		// KNOWN FAILURE: self.origin inside a worker reports the proxy origin
-		// rather than the site's. Workers use it for postMessage targetOrigin
-		// checks and for building absolute URLs.
 		"workers-self-origin",
 		`
 			${ASK}
@@ -223,14 +213,9 @@ export default [
 			assert(!String(d.origin).includes(":4500"), "self.origin must not expose the proxy origin: " + d.origin);
 			assertEqual(d.origin, location.origin, "self.origin");
 			w.terminate();
-		`
+		`,
 	),
 	workerTest(
-		// KNOWN FAILURE: a module worker that statically imports anything never
-		// starts - it dies with an error event whose message and filename are both
-		// undefined. Module workers without imports are fine, so this is import
-		// resolution inside the module worker. Vite and webpack 5 emit exactly
-		// this shape (new Worker(new URL(…), {type:"module"}) importing chunks).
 		"workers-module-with-static-import",
 		`
 			${ASK}
@@ -239,7 +224,7 @@ export default [
 			assertEqual(d.kind, "ok", "module worker with a static import: " + JSON.stringify(d));
 			assertEqual(d.v, "frommodule", "the imported binding");
 			w.terminate();
-		`
+		`,
 	),
 	workerTest(
 		"workers-shared-worker",
@@ -254,6 +239,6 @@ export default [
 			});
 			assertEqual(d.kind, "ok", "the SharedWorker replied: " + JSON.stringify(d));
 			assertEqual(d.href, location.origin + "/sharedw.js", "self.location.href in a SharedWorker");
-		`
+		`,
 	),
 ];

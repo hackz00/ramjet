@@ -1,24 +1,23 @@
 import { createStore, css, type Component } from "dreamland/core";
-import type { ScramjetFlags } from "@mercuryworkshop/scramjet";
-import { defaultConfigDev } from "@mercuryworkshop/scramjet";
+import type { RamjetFlags } from "@ramjet/core";
+import { defaultConfigDev } from "@ramjet/core";
 import { cachePlugin, controller } from "..";
 
-const flagStore = createStore<ScramjetFlags>(
+const flagStore = createStore<RamjetFlags>(
 	{
 		...defaultConfigDev.flags,
 	},
 	{
-		ident: "scramjet-flags",
+		ident: "ramjet-flags",
 		backing: "localstorage",
 		autosave: "auto",
-	}
+	},
 );
 
-// Flag descriptions for better UX
-const flagDescriptions: Record<keyof ScramjetFlags, string> = {
+const flagDescriptions: Record<keyof RamjetFlags, string> = {
 	syncxhr: "Enable synchronous XMLHttpRequest support",
 	disableComputedWrap: "Skip deep js interception for better runtime speed",
-	cleanErrors: "prevent sites from noticing scramjet stack frames",
+	cleanErrors: "prevent sites from noticing ramjet stack frames",
 	sourcemaps:
 		"prevent sites from noticing javascript transformations (at a performance cost)",
 	destructureRewrites:
@@ -30,7 +29,7 @@ const flagDescriptions: Record<keyof ScramjetFlags, string> = {
 	encapsulateWorkers:
 		"wrap web worker scripts in data urls to prevent scope issues (potentially buggy)",
 	scramitize:
-		"Trigger debugger whenever the string 'scramjet' or the real location is detected in attacker code (debug feature)",
+		"Trigger debugger whenever the string 'ramjet' or the real location is detected in attacker code (debug feature)",
 	rewriterLogs: "Enable rewriter logging (debug feature)",
 	captureErrors: "Capture and handle JavaScript errors (debug feature)",
 	debugTrampolines: "Show proxied api in stack traces (debug feature)",
@@ -51,16 +50,16 @@ const FlagEditor: Component<
 	this.isOpen = false;
 	this.cacheBustStatus = "";
 
-	const toggleFlag = (flag: keyof ScramjetFlags, value: boolean) => {
+	const toggleFlag = (flag: keyof RamjetFlags, value: boolean) => {
 		flagStore[flag] = value;
-		Object.assign(controller.scramjetConfig.flags, flagStore);
+		Object.assign(controller.ramjetConfig.flags, flagStore);
 	};
 
 	const resetToDefaults = () => {
 		Object.assign(flagStore, {
 			...defaultConfigDev.flags,
 		});
-		Object.assign(controller.scramjetConfig.flags, flagStore);
+		Object.assign(controller.ramjetConfig.flags, flagStore);
 	};
 
 	const bustCache = async () => {
@@ -78,13 +77,13 @@ const FlagEditor: Component<
 	};
 	cx.mount = async () => {
 		await controller.wait();
-		Object.assign(controller.scramjetConfig.flags, flagStore);
+		Object.assign(controller.ramjetConfig.flags, flagStore);
 	};
 
 	return (
 		<div
 			class={use(this.inline).map(
-				(inline) => `flag-editor ${inline ? "inline" : ""}`
+				(inline) => `flag-editor ${inline ? "inline" : ""}`,
 			)}
 		>
 			<button
@@ -98,7 +97,7 @@ const FlagEditor: Component<
 			{use(this.isOpen).andThen(
 				<div class="editor-panel">
 					<div class="header">
-						<h3>Scramjet Feature Flags</h3>
+						<h3>Ramjet Feature Flags</h3>
 						<div class="header-actions">
 							<button class="cache-bust-button" on:click={bustCache}>
 								Bust Cache
@@ -109,10 +108,10 @@ const FlagEditor: Component<
 						</div>
 					</div>
 					{use(this.cacheBustStatus).andThen(
-						<div class="cache-bust-status">{use(this.cacheBustStatus)}</div>
+						<div class="cache-bust-status">{use(this.cacheBustStatus)}</div>,
 					)}
 					<div class="flags-list">
-						{(Object.keys(flagStore) as Array<keyof ScramjetFlags>).map(
+						{(Object.keys(flagStore) as Array<keyof RamjetFlags>).map(
 							(flag) => (
 								<label class="flag-item">
 									<input
@@ -127,10 +126,10 @@ const FlagEditor: Component<
 										<span class="flag-desc">{flagDescriptions[flag]}</span>
 									</div>
 								</label>
-							)
+							),
 						)}
 					</div>
-				</div>
+				</div>,
 			)}
 		</div>
 	);

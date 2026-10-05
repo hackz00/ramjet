@@ -1,9 +1,9 @@
 import { BareResponse } from "@mercuryworkshop/proxy-transports";
 import {
 	BodyType,
-	ScramjetFetchHandler,
-	ScramjetFetchParsed,
-	ScramjetFetchRequest,
+	RamjetFetchHandler,
+	RamjetFetchParsed,
+	RamjetFetchRequest,
 } from ".";
 import {
 	flagEnabled,
@@ -15,42 +15,74 @@ import {
 	rewriteWorkers,
 } from "@/shared";
 import { sniffEncoding } from "@/shared/sniffEncoding";
+import { collectPrefetchHints, type PrefetchHint } from "@rewriters/hints";
+import { createStreamingRewriter } from "@rewriters/html-stream";
+import { streamHtmlResponse } from "./stream-html";
+import { Tap } from "@/Tap";
 import { _TextDecoder } from "@/shared/snapshot";
 
 export async function rewriteBody(
-	handler: ScramjetFetchHandler,
-	request: ScramjetFetchRequest,
-	parsed: ScramjetFetchParsed,
-	response: BareResponse
+	handler: RamjetFetchHandler,
+	request: RamjetFetchRequest,
+	parsed: RamjetFetchParsed,
+	response: BareResponse,
 ): Promise<BodyType> {
 	switch (parsed.destination) {
 		case "iframe":
 		case "document":
 			if (isHtmlMimeType(response.headers.get("content-type") ?? "")) {
-				const buf = await response.arrayBuffer();
-				const bytes = new Uint8Array(buf);
-				const encoding = sniffEncoding(
-					bytes,
-					response.headers.get("content-type")
-				);
-				const htmlContent = new _TextDecoder(encoding).decode(bytes);
-
-				return rewriteHtml(htmlContent, handler.context, parsed.meta, {
+				const htmlcontext = {
 					loadScripts: true,
 					inline: true,
 					source: parsed.url.href,
 					headers: response.rawHeaders,
-					// reasonably confident that a document fetch is impossible without a client
+
 					history: parsed.trackedClient!.history,
-				});
+				};
+
+				const streaming =
+					handler.streamHtml &&
+					response.body &&
+					!Tap.hasListeners(handler.hooks.fetch.response)
+						? createStreamingRewriter(handler.context, parsed.meta, htmlcontext)
+						: null;
+				if (streaming) {
+					return streamHtmlResponse(
+						response,
+						streaming,
+						request,
+						handler.prefetcher,
+					);
+				}
+
+				const buf = await response.arrayBuffer();
+				const bytes = new Uint8Array(buf);
+				const encoding = sniffEncoding(
+					bytes,
+					response.headers.get("content-type"),
+				);
+				const htmlContent = new _TextDecoder(encoding).decode(bytes);
+
+				const hints: PrefetchHint[] = [];
+				const html = collectPrefetchHints(hints, () =>
+					rewriteHtml(htmlContent, handler.context, parsed.meta, {
+						loadScripts: true,
+						inline: true,
+						source: parsed.url.href,
+						headers: response.rawHeaders,
+
+						history: parsed.trackedClient!.history,
+					}),
+				);
+				handler.prefetcher.schedule(request, hints);
+				return html;
 			} else {
 				return response.body;
 			}
 		case "script": {
-			// do not attempt to rewrite a 404 response
 			if (response.ok) {
 				const ct = response.headers.get("content-type");
-				// don't rewrite invalid module scripts when the server declares a non-JS type
+
 				if (parsed.isModule && ct && !isJavascriptMimeType(ct)) {
 					return response.body;
 				}
@@ -60,7 +92,7 @@ export async function rewriteBody(
 					response.url,
 					handler.context,
 					parsed.meta,
-					parsed.isModule
+					parsed.isModule,
 				);
 
 				if (
@@ -76,8 +108,15 @@ export async function rewriteBody(
 			}
 			return response.body;
 		}
-		case "style":
-			return rewriteCss(await response.text(), handler.context, parsed.meta);
+		case "style": {
+			const hints: PrefetchHint[] = [];
+			const css = await response.text();
+			const rewritten = collectPrefetchHints(hints, () =>
+				rewriteCss(css, handler.context, parsed.meta),
+			);
+			handler.prefetcher.schedule(request, hints);
+			return rewritten;
+		}
 		case "sharedworker":
 		case "worker":
 			return rewriteWorkers(
@@ -85,7 +124,7 @@ export async function rewriteBody(
 				response.url,
 				handler.context,
 				parsed.meta,
-				parsed.isModule
+				parsed.isModule,
 			);
 		default:
 			return response.body;

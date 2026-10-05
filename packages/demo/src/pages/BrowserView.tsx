@@ -7,12 +7,13 @@ import {
 import {
 	CatchEscapedLinksPlugin,
 	UrlWatcherPlugin,
-} from "@mercuryworkshop/scramjet-utils";
-import { versionInfo } from "@mercuryworkshop/scramjet";
+} from "@ramjet/utils";
+import { versionInfo } from "@ramjet/core";
 import { cachePlugin, controller } from "..";
 import { demoSettingsStore } from "../store";
 import homepage from "./homepage.html?raw";
-import type { Frame } from "@mercuryworkshop/scramjet-controller";
+import type { Frame } from "@ramjet/controller";
+import { resolveAddress } from "../navigation";
 
 export const browserState = createState({
 	url: demoSettingsStore.homeUrl,
@@ -21,9 +22,7 @@ export const browserState = createState({
 
 export const Omnibox: Component = function (cx) {
 	const navigate = () => {
-		if (!browserState.url.startsWith("http")) {
-			browserState.url = `https://${browserState.url}`;
-		}
+		browserState.url = resolveAddress(browserState.url);
 		demoSettingsStore.homeUrl = browserState.url;
 		browserState.frame?.go(browserState.url);
 	};
@@ -32,7 +31,13 @@ export const Omnibox: Component = function (cx) {
 			class="url-form"
 			on:submit={(e: SubmitEvent) => {
 				e.preventDefault();
-				navigate();
+				const input = (e.currentTarget as HTMLFormElement).querySelector("input")!;
+				try {
+					navigate();
+				} catch (error) {
+					input.setCustomValidity(error instanceof Error ? error.message : String(error));
+					input.reportValidity();
+				}
 			}}
 		>
 			<div class="browser-omnibox-shell">
@@ -65,6 +70,7 @@ export const Omnibox: Component = function (cx) {
 					type="text"
 					value={use(browserState.url)}
 					spellcheck="false"
+					on:input={(e: Event) => (e.currentTarget as HTMLInputElement).setCustomValidity("")}
 					placeholder="Enter URL or search..."
 				/>
 			</div>
@@ -165,15 +171,15 @@ const BrowserView: Component<
 		});
 		let realHomepage = homepage;
 		realHomepage = realHomepage.replaceAll(
-			"{{SCRAMJET_VERSION}}",
+			"{{RAMJET_VERSION}}",
 			String(versionInfo.version)
 		);
 		realHomepage = realHomepage.replaceAll(
-			"{{SCRAMJET_BUILD}}",
+			"{{RAMJET_BUILD}}",
 			String(versionInfo.build)
 		);
 		realHomepage = realHomepage.replaceAll(
-			"{{SCRAMJET_DATE_PRETTY}}",
+			"{{RAMJET_DATE_PRETTY}}",
 			new Date(versionInfo.date).toLocaleString(undefined, {
 				dateStyle: "short",
 				timeStyle: "short",
@@ -194,7 +200,11 @@ const BrowserView: Component<
 				(active) => `tab-panel browser-view ${active ? "active" : ""}`
 			)}
 		>
-			<iframe this={use(this.frameel)}></iframe>
+			<iframe
+				this={use(this.frameel)}
+				title="Proxied website"
+				allow="autoplay; fullscreen; encrypted-media; picture-in-picture; clipboard-write; microphone; camera"
+			></iframe>
 		</div>
 	);
 };
@@ -215,6 +225,8 @@ BrowserView.style = css`
 	iframe {
 		background: white;
 		flex: 1;
+		width: 100%;
+		min-height: 0;
 		border: none;
 	}
 `;

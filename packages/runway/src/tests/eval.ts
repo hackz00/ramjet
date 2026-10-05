@@ -1,16 +1,5 @@
 import { basicTest, htmlTest } from "../testcommon.ts";
 
-// Coverage for packages/core/src/client/shared/eval.ts (the direct-eval
-// rewritefn and the indirect-eval proxy) plus the rewriter's `eval` call-site
-// handling in rewriter/js/src/visitor.rs.
-//
-// Two failure modes matter here:
-//   1. escapes  - eval'd code that wasn't rewritten, so it can see the real
-//                 `top`/`parent`/`location`/`eval`. Covered with checkglobal().
-//   2. divergences - eval behaving differently than it does on the open web.
-//                 Anything without checkglobal() runs in both the scramjet and
-//                 the bare harness and must agree.
-
 export default [
 	basicTest({
 		name: "eval-direct-sanity",
@@ -69,13 +58,6 @@ export default [
 			`,
 	}),
 
-	// ------------------------------------------------------------------
-	// the indirect eval proxy as a function object
-	//
-	// createIndirectEval() is memoized per client, so every route to `eval`
-	// has to hand back the *same* object and it has to keep looking like the
-	// native eval. Fingerprinting scripts check all of this.
-	// ------------------------------------------------------------------
 	basicTest({
 		name: "eval-indirect-identity-stable",
 		js: `
@@ -88,7 +70,7 @@ export default [
 		name: "eval-indirect-identity-all-views",
 		js: `
 			// every one of these resolves through a different rewrite path
-			// (wrapfn, the $scramjet__eval accessor, wrappropertyfn, and a
+			// (wrapfn, the $ramjet__eval accessor, wrappropertyfn, and a
 			// rewrite performed inside eval itself) and they must converge.
 			const views = new Set([
 				eval,
@@ -154,10 +136,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// V8 renders Function.prototype.toString of a *proxied* function
-		// without the target's name, so the indirect eval has to be registered
-		// in box.unproxy for the toString trap in shared/sourcemaps.ts to swap
-		// it back out. Regression test for that registration.
 		name: "eval-indirect-tostring-preserves-name",
 		js: `
 			assertEqual(
@@ -168,14 +146,6 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
-	// argument handling
-	//
-	// > If the argument of eval() is not a string, eval() returns the argument
-	// > unchanged
-	// Both the rewritefn and the proxy's apply trap have to bail out early
-	// without coercing, and they must not disturb the completion value.
-	// ------------------------------------------------------------------
 	basicTest({
 		name: "eval-nonstring-passthrough",
 		js: `
@@ -269,17 +239,7 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
-	// call-site syntax
-	//
-	// visit_call_expression() only rewrites `eval(...)` when the callee is a
-	// bare, non-optional identifier, and it derives the argument span from the
-	// callee's end offset. Both of those are easy to get wrong.
-	// ------------------------------------------------------------------
 	basicTest({
-		// KNOWN FAILURE: the injected rewritefn call is placed at
-		// `callee.span.end + 1`, so any whitespace between `eval` and `(`
-		// leaves it outside the argument list: `eval $scramjet$rewrite(("x"))`.
 		name: "eval-callee-whitespace",
 		js: `
 			assertEqual(eval ("1+1"), 2, "space between callee and argument list");
@@ -289,17 +249,12 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: same offset arithmetic, except here the rewritefn
-		// lands *inside* the comment: `eval/$scramjet$rewrite(*c*/("x"))`.
 		name: "eval-callee-comment",
 		js: `
 			assertEqual(eval/* hi */("1+1"), 2, "comment between callee and argument list");
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: parentheses around the callee are transparent, so this
-		// is still a direct eval per spec, but the rewriter sees a plain
-		// identifier reference and wraps it into the indirect eval instead.
 		name: "eval-parenthesized-is-direct",
 		js: `
 			window.pv = 1;
@@ -388,28 +343,18 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: Reflect.get bypasses the $scramjet__eval accessor and
-		// hands out the realm's real eval, whose output is never rewritten.
 		name: "eval-reflect-get-leak",
 		js: `
 			Reflect.get(window, "eval")("checkglobal(top)");
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: same leak through a property descriptor.
 		name: "eval-gopd-leak",
 		js: `
 			Object.getOwnPropertyDescriptor(window, "eval").value("checkglobal(top)");
 		`,
 	}),
 
-	// ------------------------------------------------------------------
-	// direct eval scope semantics
-	//
-	// The rewritefn must not turn a direct eval into anything else: the eval'd
-	// code keeps the caller's variable environment, this-binding, new.target,
-	// super-binding and strictness.
-	// ------------------------------------------------------------------
 	basicTest({
 		name: "eval-direct-arguments",
 		js: `
@@ -541,13 +486,6 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
-	// strictness and directive prologues
-	//
-	// rewriteJs() has a special case that keeps injected code from landing in
-	// front of "use strict"; if that ever slips, eval'd code silently becomes
-	// sloppy.
-	// ------------------------------------------------------------------
 	basicTest({
 		name: "eval-directive-makes-strict",
 		js: `
@@ -603,12 +541,6 @@ export default [
 		</script></body></html>`,
 	}),
 
-	// ------------------------------------------------------------------
-	// errors
-	//
-	// A rewriter that fails to parse must not swallow the failure, change the
-	// error type, or hand the original source through unrewritten.
-	// ------------------------------------------------------------------
 	basicTest({
 		name: "eval-syntax-errors",
 		js: `
@@ -652,9 +584,6 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
-	// rewriting applied to the eval'd source itself
-	// ------------------------------------------------------------------
 	basicTest({
 		name: "eval-location-read",
 		js: `
@@ -692,7 +621,7 @@ export default [
 			// rewritten source
 			const f = eval("(function evalFn() { return typeof top; })");
 			const s = f.toString();
-			assert(!s.includes("scramjet"), "eval'd function source must not leak rewriter internals: " + s);
+			assert(!s.includes("ramjet"), "eval'd function source must not leak rewriter internals: " + s);
 			assert(s.includes("typeof top"), "eval'd function source must round-trip: " + s);
 		`,
 	}),
@@ -718,14 +647,6 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
-	// objects that merely have an "eval" property
-	//
-	// `eval` is one of the rewriter's UNSAFE_GLOBALS, so *every* `.eval`
-	// property access in the program is redirected through the
-	// $scramjet__eval accessor on Object.prototype - including accesses on
-	// objects that have nothing to do with the global eval.
-	// ------------------------------------------------------------------
 	basicTest({
 		name: "eval-plain-object-property",
 		js: `
@@ -746,8 +667,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: `delete o.eval` is rewritten to
-		// `delete o.$scramjet__eval`, which deletes nothing and reports success.
 		name: "eval-delete-property",
 		js: `
 			const o = { eval: 1 };
@@ -756,10 +675,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: a direct call is rewritten to
-		// `eval($scramjet$rewrite(...))` without checking whether `eval` still
-		// refers to the global, so a shadowing binding receives rewritten
-		// source instead of what the program passed.
 		name: "eval-shadowed-binding",
 		js: `
 			let got = null;
@@ -770,9 +685,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: wrapfn compares the incoming value against
-		// `self.eval`, which is whatever the page last assigned, so an
-		// overwritten window.eval still reads back as the indirect eval proxy.
 		name: "eval-overwritten-global",
 		js: `
 			const orig = window.eval;
@@ -785,9 +697,6 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
-	// TrustedScript
-	// ------------------------------------------------------------------
 	basicTest({
 		name: "eval-trustedscript-direct",
 		js: `
@@ -803,9 +712,6 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
-	// other realms and other global scopes
-	// ------------------------------------------------------------------
 	basicTest({
 		name: "eval-iframe-realm",
 		js: `

@@ -1,40 +1,23 @@
-/**
- * @fileoverview
- * Validates the packages structure with the expected bundles and some core type definition files.
- * This is meant to be run in CI, but you can run it locally too after executing `pnpm prepack` if you want to test before committing.
- */
-
 import test from "ava";
 import { glob } from "glob";
 import { existsSync } from "node:fs";
 
-/**
- * Expected distribution files for Scramjet's bundles.
- * All JS files listed must have corresponding source maps.
- * These aren't globs.
- */
 const EXPECTED_CORE_DIST_FILES = [
-	"packages/core/dist/scramjet.js",
-	"packages/core/dist/scramjet.mjs",
-	"packages/core/dist/scramjet_bundled.js",
-	"packages/core/dist/scramjet_bundled.mjs",
-	"packages/core/dist/scramjet.wasm",
+	"packages/core/dist/ramjet.js",
+	"packages/core/dist/ramjet.mjs",
+	"packages/core/dist/ramjet_bundled.js",
+	"packages/core/dist/ramjet_bundled.mjs",
+	"packages/core/dist/ramjet.wasm",
 ];
 
-/**
- * Required type definition files and directories.
- * These aren't going to be all, because the modules update quite often, but the entry points and basic structure will be validatedl
- */
 const EXPECTED_TYPE_FILES = [
 	"packages/core/dist/types/**/*.d.ts",
 	"packages/core/dist/types/index.d.ts",
+	"packages/core/dist/types/fetch/index.d.ts",
+	"packages/core/dist/types/global.d.ts",
 	"packages/core/lib/index.d.ts",
 ];
 
-/**
- * Validates that all required distribution files exist in the package.
- * @param {import("ava").ExecutionContext} t - AVA unit test context.
- */
 test("Package contains all required distribution files", async (t) => {
 	const missingFiles = [];
 
@@ -47,17 +30,13 @@ test("Package contains all required distribution files", async (t) => {
 	t.deepEqual(
 		missingFiles,
 		[],
-		`Missing required distribution files: ${missingFiles.join(", ")}`
+		`Missing required distribution files: ${missingFiles.join(", ")}`,
 	);
 });
 
-/**
- * Validates that all required JS files have their corresponding source maps.
- * @param {import("ava").ExecutionContext} t - AVA unit test context.
- */
 test("All required JS bundles have corresponding source maps", async (t) => {
 	const jsFiles = EXPECTED_CORE_DIST_FILES.filter((file) =>
-		file.endsWith(".js")
+		file.endsWith(".js"),
 	);
 	const missingMaps = [];
 
@@ -71,14 +50,10 @@ test("All required JS bundles have corresponding source maps", async (t) => {
 	t.deepEqual(
 		missingMaps,
 		[],
-		`Missing source map files: ${missingMaps.join(", ")}`
+		`Missing source map files: ${missingMaps.join(", ")}`,
 	);
 });
 
-/**
- * Validates that core type definition are included in the package.
- * @param {import("ava").ExecutionContext} t - AVA unit test context.
- */
 test("Package contains required type definitions", async (t) => {
 	const missingTypeGlobs = [];
 
@@ -92,15 +67,10 @@ test("Package contains required type definitions", async (t) => {
 	t.deepEqual(
 		missingTypeGlobs,
 		[],
-		`No type definition files found for globs: ${missingTypeGlobs.join(", ")}`
+		`No type definition files found for globs: ${missingTypeGlobs.join(", ")}`,
 	);
 });
 
-/**
- * Validates the expected distribution format with globs for the package structure.
- * This serves as a last check for the basic structure of the package.
- * @param {import("ava").ExecutionContext} t - AVA unit test context.
- */
 test("Package structure is valid for distribution", async (t) => {
 	const distFiles = await glob("packages/core/dist/**/*");
 	const libFiles = await glob("packages/core/lib/**/*");

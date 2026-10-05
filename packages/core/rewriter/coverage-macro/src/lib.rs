@@ -1,20 +1,5 @@
-//! Build-time coverage proof for the JS rewriter visitor.
-//!
-//! The `#[coverage_checked(Node)]` attribute on a method whose receiver is a
-//! `&Node` parameter analyzes the body for marker-macro invocations and
-//! asserts that every field of `Node` whose type can transitively reach
-//! `Expression` is covered on every control-flow path that exits the method.
-//!
-//! Marker macros (recognized only inside `#[coverage_checked]` methods):
-//!   - `walk_all!(it)`                            covers all fields
-//!   - `walk_field!(it.foo)`                      covers field `foo`
-//!   - `walk_field_ctx!(self, ctx_expr, it.foo)`  covers `foo`, pushes ctx
-//!   - `skip_field!(it.foo, "reason")`            covers `foo`; the field's
-//!                                                 type must not be in R
-//!
-//! If a field can't be covered on every path, the macro emits a
-//! `compile_error!` containing a minimal JS snippet that would exhibit the
-//! missed rewrite.
+
+
 
 mod analyze;
 mod ast_table;
@@ -58,20 +43,17 @@ pub fn coverage_checked(attr: TokenStream, item: TokenStream) -> TokenStream {
         .into();
     };
 
-    // 1. Expand marker macros in the body to real walk code.
+
     let new_body = expand_markers(&node_name, **def, &func.block, &graph);
     let new_body: syn::Block = match parse_str(&new_body.to_string()) {
         Ok(b) => b,
         Err(_) => {
-            // Fall back to leaving the body untouched if our rewrite produced
-            // bad tokens — analysis still runs.
+
             (*func.block).clone()
         }
     };
 
-    // 2. Run analysis on the *original* body (to find marker uses) — with
-    //    the helper index so calls into known-fully-covering helpers credit
-    //    coverage at the call site.
+
     let mut findings = Findings::default();
     let helper_idx = index();
     let mut helpers_by_name: std::collections::HashMap<String, helper_index::HelperInfo> =
@@ -90,11 +72,11 @@ pub fn coverage_checked(attr: TokenStream, item: TokenStream) -> TokenStream {
         origins,
     );
 
-    // 3. Check skip-field soundness directly from the original body's tokens.
+
     let mut errors: Vec<TokenStream2> = Vec::new();
     check_skip_soundness(&func.block, def.fields, &graph, &mut errors);
 
-    // 4. For every R-field of `def`, ensure every termination path covers it.
+
     for f in def.fields {
         if !graph.field_in_r(f) {
             continue;
@@ -114,7 +96,7 @@ pub fn coverage_checked(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
 
-    // 5. Replace function body with the expanded markers.
+
     *func.block = new_body;
 
     let out = quote! {
@@ -175,7 +157,7 @@ fn check_skip_soundness(
     graph: &AstGraph,
     errors: &mut Vec<TokenStream2>,
 ) {
-    // Walk the block's syn AST looking for skip_field! invocations.
+
     syn::visit::visit_block(&mut SkipChecker { fields, graph, errors }, block);
 }
 
@@ -208,9 +190,7 @@ impl<'ast, 'a> syn::visit::Visit<'ast> for SkipChecker<'a> {
                 }
             }
         } else if name == "audit_skip" {
-            // Require a non-empty reason string literal as the second arg.
-            // We accept any second token group that contains a string with
-            // at least one non-whitespace char.
+
             if !audit_skip_has_reason(&m.tokens) {
                 self.errors.push(emit_diag(
                     m.span(),
@@ -233,8 +213,7 @@ impl<'ast, 'a> syn::visit::Visit<'ast> for SkipChecker<'a> {
 }
 
 fn audit_skip_has_reason(ts: &proc_macro2::TokenStream) -> bool {
-    // Both `audit_skip!(it.<field>, "reason")` and `audit_skip!("reason")` are
-    // accepted — just look for any non-empty string literal in the tokens.
+
     use proc_macro2::TokenTree;
     for tt in ts.clone() {
         if let TokenTree::Literal(lit) = tt {
@@ -256,11 +235,9 @@ fn build_witness_snippet(graph: &AstGraph, node: &str, f: &Field) -> String {
     let Some(path) = find_witness_with_hints(graph, leak_str(node.to_string()), f, &hints) else {
         return "<no witness found>".to_string();
     };
-    // Compose inner snippet from witness.
+
     let inner = render_snippet(graph, &path);
-    // Wrap in the node's template too, so the snippet is a complete program.
-    // For most program-level nodes (Statement variants) this is enough; for
-    // expressions we wrap in `(...);`.
+
     inner
 }
 
@@ -357,14 +334,10 @@ fn try_expand_marker(
 ) -> Option<TokenStream2> {
     match name {
         "walk_all" => {
-            // walk_all!(it) delegates to oxc's default walk_<snake_node>(self, it).
-            // That walker traverses every child correctly (in the right order
-            // and dispatching variants of enums). Coverage analysis treats
-            // this as covering every field of `def`.
+
             let walk_fn = walk_fn_for_type(def.name);
             let walk_fn: syn::Path = syn::parse_str(&walk_fn).ok()?;
-            // Special case: visit_function takes an extra `flags` argument
-            // that walk_function also expects.
+
             if def.name == "Function" {
                 Some(quote! { #walk_fn (self, it, flags); })
             } else {
@@ -438,7 +411,7 @@ fn walk_for_field(f: &Field) -> Option<TokenStream2> {
 }
 
 fn walk_fn_for_type(ty: &str) -> String {
-    // Convert PascalCase to snake_case and prefix with `walk::walk_`.
+
     let mut s = String::with_capacity(ty.len() + 12);
     s.push_str("walk::walk_");
     for (i, ch) in ty.chars().enumerate() {

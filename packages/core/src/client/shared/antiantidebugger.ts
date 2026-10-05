@@ -1,18 +1,15 @@
-import { ScramjetClient } from "@client/index";
+import { RamjetClient } from "@client/index";
 
-export default function (client: ScramjetClient) {
+export default function (client: RamjetClient) {
 	client.Proxy("console.clear", {
 		apply(ctx) {
-			// fuck you
 			ctx.return(undefined);
 		},
 	});
 
 	const log = console.log;
 	client.Trap("console.log", {
-		set(_ctx, _v) {
-			// is there a legitimate reason to let sites do this?
-		},
+		set(_ctx, _v) {},
 		get(_ctx) {
 			return log;
 		},

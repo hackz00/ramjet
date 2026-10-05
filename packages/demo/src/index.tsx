@@ -2,9 +2,10 @@ import LoadInterstitial from "./components/LoadInterstitial";
 import App from "./App";
 import LibcurlClient from "@mercuryworkshop/libcurl-transport";
 import EpoxyClient from "@mercuryworkshop/epoxy-transport";
-import { defaultConfigDev } from "@mercuryworkshop/scramjet";
-import { Controller } from "@mercuryworkshop/scramjet-controller";
-import { HttpCachePlugin } from "@mercuryworkshop/scramjet-utils";
+import { AssistedTransport } from "@ramjet/transport-assisted";
+import { defaultConfigDev } from "@ramjet/core";
+import { Controller } from "@ramjet/controller";
+import { HttpCachePlugin } from "@ramjet/utils";
 import { demoSettingsStore } from "./store";
 
 let app = document.getElementById("app")!;
@@ -12,14 +13,19 @@ let app = document.getElementById("app")!;
 let controller: InstanceType<typeof Controller>;
 const cachePlugin = new HttpCachePlugin();
 
-export function getTransport(): LibcurlClient | EpoxyClient {
+export function getTransport():
+	| LibcurlClient
+	| EpoxyClient
+	| AssistedTransport {
 	const wispUrl = demoSettingsStore.wispUrl;
 	switch (demoSettingsStore.transport) {
 		case "epoxy":
 			return new EpoxyClient({ wisp: wispUrl });
 		case "libcurl":
-		default:
 			return new LibcurlClient({ wisp: wispUrl });
+		case "assisted":
+		default:
+			return new AssistedTransport({ url: demoSettingsStore.assistedUrl });
 	}
 }
 
@@ -37,10 +43,9 @@ async function waitForControllerOrReady(timeoutMs = 10000): Promise<void> {
 		} as any);
 	});
 	const timeout = new Promise<void>((resolve) =>
-		setTimeout(resolve, timeoutMs)
+		setTimeout(resolve, timeoutMs),
 	);
 
-	// Wait for whichever happens first; on timeout we continue to avoid blocking the UI.
 	await Promise.race([ready, controllerChanged, timeout]);
 }
 
@@ -54,7 +59,6 @@ async function init() {
 	try {
 		const registration = await navigator.serviceWorker.register("./sw.js");
 
-		// Non-blocking progress updates on state transitions.
 		const updateStatus = (sw: ServiceWorker | null) => {
 			if (!sw) return;
 			const set = (msg: string) => (interstitial.$.state.status = msg);
@@ -83,7 +87,6 @@ async function init() {
 
 		updateStatus(registration.installing ?? registration.waiting ?? null);
 
-		// Wait for control or readiness with a timeout; don't hang the UI on updates.
 		interstitial.$.state.status =
 			"Waiting for service worker to take control...";
 		await waitForControllerOrReady(10000);
@@ -96,7 +99,7 @@ async function init() {
 		controller = new Controller({
 			serviceworker: readySw,
 			transport: getTransport(),
-			scramjetConfig: defaultConfigDev,
+			ramjetConfig: defaultConfigDev,
 		});
 		await controller.wait();
 		console.log(controller);
@@ -104,7 +107,7 @@ async function init() {
 		interstitial.close();
 	} catch (e) {
 		console.error("Error during service worker registration:", e);
-		// Always close the modal on error to prevent hanging UI.
+
 		try {
 			interstitial.close();
 		} catch {}
@@ -121,8 +124,8 @@ async function mount() {
 		let err = e as any;
 		app.replaceWith(
 			document.createTextNode(
-				`Error mounting: ${"message" in err ? err.message : err}`
-			)
+				`Error mounting: ${"message" in err ? err.message : err}`,
+			),
 		);
 		console.error(err);
 		throw e;

@@ -1,6 +1,3 @@
-// WARNING: SLOP FILE
-// DO NOT TRUST THIS CODE
-
 import { _Set } from "./snapshot";
 
 /**
@@ -21,14 +18,10 @@ function asciiLower(s: string): string {
 export interface ParsedMimeType {
 	type: string;
 	subtype: string;
-	/** `type`/`subtype` in ASCII lowercase; excludes parameters. */
+
 	essence: string;
 }
 
-/**
- * Parses a MIME type string (e.g. a Content-Type value) into type, subtype, and essence.
- * Returns null if the input is not a valid MIME type.
- */
 export function parseMimeType(input: string): ParsedMimeType | null {
 	const trimmed = trimHttpWhitespace(input);
 	if (!trimmed) return null;
@@ -92,13 +85,11 @@ const JAVASCRIPT_ESSENCES = new _Set([
 	"text/x-javascript",
 ]);
 
-/** A MIME type whose type is "image". */
 export function isImageMimeType(mime: string | ParsedMimeType): boolean {
 	const p = asParsed(mime);
 	return p !== null && asciiLower(p.type) === "image";
 }
 
-/** Audio, video, or essence `application/ogg`. */
 export function isAudioOrVideoMimeType(mime: string | ParsedMimeType): boolean {
 	const p = asParsed(mime);
 	if (!p) return false;
@@ -107,7 +98,6 @@ export function isAudioOrVideoMimeType(mime: string | ParsedMimeType): boolean {
 	return p.essence === "application/ogg";
 }
 
-/** Type `font` or a registered font essence. */
 export function isFontMimeType(mime: string | ParsedMimeType): boolean {
 	const p = asParsed(mime);
 	if (!p) return false;
@@ -115,7 +105,6 @@ export function isFontMimeType(mime: string | ParsedMimeType): boolean {
 	return FONT_ESSENCES.has(p.essence);
 }
 
-/** Subtype ends with `+zip` or essence `application/zip`. */
 export function isZipBasedMimeType(mime: string | ParsedMimeType): boolean {
 	const p = asParsed(mime);
 	if (!p) return false;
@@ -123,13 +112,11 @@ export function isZipBasedMimeType(mime: string | ParsedMimeType): boolean {
 	return asciiLower(p.subtype).endsWith("+zip");
 }
 
-/** One of the archive essences. */
 export function isArchiveMimeType(mime: string | ParsedMimeType): boolean {
 	const p = asParsed(mime);
 	return p !== null && ARCHIVE_ESSENCES.has(p.essence);
 }
 
-/** Subtype ends with `+xml` or essence `text/xml` / `application/xml`. */
 export function isXmlMimeType(mime: string | ParsedMimeType): boolean {
 	const p = asParsed(mime);
 	if (!p) return false;
@@ -137,13 +124,11 @@ export function isXmlMimeType(mime: string | ParsedMimeType): boolean {
 	return p.essence === "text/xml" || p.essence === "application/xml";
 }
 
-/** Essence `text/html`. */
 export function isHtmlMimeType(mime: string | ParsedMimeType): boolean {
 	const p = asParsed(mime);
 	return p !== null && p.essence === "text/html";
 }
 
-/** XML, HTML, or `application/pdf`. */
 export function isScriptableMimeType(mime: string | ParsedMimeType): boolean {
 	const p = asParsed(mime);
 	if (!p) return false;
@@ -152,16 +137,11 @@ export function isScriptableMimeType(mime: string | ParsedMimeType): boolean {
 	return p.essence === "application/pdf";
 }
 
-/** Essence is one of the JavaScript MIME type essences. */
 export function isJavascriptMimeType(mime: string | ParsedMimeType): boolean {
 	const p = asParsed(mime);
 	return p !== null && JAVASCRIPT_ESSENCES.has(p.essence);
 }
 
-/**
- * True if the string is an ASCII case-insensitive match for one of the
- * JavaScript MIME type essence strings (not necessarily a full parsed MIME type).
- */
 export function isJavascriptMimeTypeEssenceMatch(s: string): boolean {
 	const t = trimHttpWhitespace(s);
 	if (!t) return false;
@@ -177,7 +157,7 @@ export function getScriptBlockTypeString(
 	type: string | null | undefined,
 	language: string | null | undefined,
 	hasTypeAttribute = type != null,
-	hasLanguageAttribute = language != null
+	hasLanguageAttribute = language != null,
 ): string {
 	if (
 		(hasTypeAttribute && (type ?? "") === "") ||
@@ -207,19 +187,14 @@ export function isScriptType(type: string | null | undefined): boolean {
 	return isJavascriptMimeTypeEssenceMatch(t);
 }
 
-/** Whether `type` denotes a JavaScript module script. */
 export function isModuleScriptType(type: string | null | undefined): boolean {
 	if (type == null) return false;
 	const t = trimHttpWhitespace(type);
 	return t !== "" && asciiLower(t) === "module";
 }
 
-/**
- * MIME types typically shown inline in a browsing context (navigation / iframe),
- * as opposed to triggering a download when Content-Disposition is absent.
- */
 export function isInlineDisplayableMimeType(
-	mime: string | ParsedMimeType
+	mime: string | ParsedMimeType,
 ): boolean {
 	const p = asParsed(mime);
 	if (!p) return false;

@@ -1,6 +1,5 @@
 import { basicTest, htmlTest } from "../testcommon.ts";
 
-// TODO: these tests suck
 export default [
 	basicTest({
 		name: "documentwrite-sanity",

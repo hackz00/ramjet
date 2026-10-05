@@ -1,19 +1,12 @@
 import { serverTest } from "../../testcommon.ts";
 
-// Two request paths that only fail loudly in production: file uploads, where
-// the multipart body has to reach the origin byte for byte, and beacons, which
-// are fire-and-forget so a page never notices when they vanish. The beacon tests
-// are resolved by the server, so they only pass if the request really arrived.
-//
-// Nothing here diverges - this is regression cover for an area with no tests.
-
 const uploadTest = (
 	name: string,
 	js: string,
 	opts: {
 		autoPass?: boolean;
 		onRequest?: (req: any, body: string, ctx: any) => void;
-	} = {}
+	} = {},
 ) =>
 	serverTest({
 		name,
@@ -35,7 +28,7 @@ const uploadTest = (
 							method: req.method,
 							ct: req.headers["content-type"] ?? null,
 							body,
-						})
+						}),
 					);
 					if (opts.onRequest) opts.onRequest(req, body, ctx);
 				});
@@ -57,7 +50,7 @@ export default [
 			assert(j.body.includes('filename="up.txt"'), "the filename survived");
 			assert(j.body.includes("filecontent"), "the file content survived");
 			assert(j.body.includes('name="field"'), "the text field survived alongside it");
-		`
+		`,
 	),
 	uploadTest(
 		"uploads-input-files-and-form",
@@ -79,7 +72,7 @@ export default [
 			const j = await (await fetch("/upload", { method: "POST", body: new FormData(form) })).json();
 			assert(j.body.includes('filename="in.txt"'), "the upload reached the origin");
 			assert(j.body.includes("viainput"), "with its content");
-		`
+		`,
 	),
 	uploadTest(
 		"uploads-binary-body",
@@ -94,7 +87,7 @@ export default [
 			const big = new Uint8Array(64 * 1024).fill(65);
 			const j2 = await (await fetch("/upload", { method: "POST", body: big })).json();
 			assertEqual(j2.body.length, 64 * 1024, "a 64KiB body arrived intact");
-		`
+		`,
 	),
 	uploadTest(
 		"beacons-sendbeacon-string",
@@ -110,7 +103,7 @@ export default [
 				if (body === "beaconpayload") pass("the beacon arrived at the origin");
 				else fail("the beacon body was " + JSON.stringify(body));
 			},
-		}
+		},
 	),
 	uploadTest(
 		"beacons-sendbeacon-blob",
@@ -125,7 +118,7 @@ export default [
 				if (body === "blobbeacon") pass("the blob beacon arrived");
 				else fail("the blob beacon body was " + JSON.stringify(body));
 			},
-		}
+		},
 	),
 	uploadTest(
 		"beacons-keepalive-fetch",
@@ -139,6 +132,6 @@ export default [
 				if (body === "kapayload") pass("the keepalive fetch arrived");
 				else fail("the keepalive body was " + JSON.stringify(body));
 			},
-		}
+		},
 	),
 ];

@@ -4,9 +4,9 @@ import type {
 	TransferrableResponse,
 } from "@mercuryworkshop/proxy-transports";
 
-import { RpcHelper } from "@mercuryworkshop/rpc";
-import type { Config } from ".";
-import { CONTROLLERFRAME } from "./symbols";
+import { RpcHelper } from "@ramjet/rpc";
+import type { Config, Frame } from ".";
+import { CONTROLLERFRAME, SHARED_WASM_MODULE } from "./symbols";
 import type {
 	SerializedCookieSyncEntry,
 	ControllerToTransport,
@@ -15,21 +15,23 @@ import type {
 } from "./types";
 import {
 	CookieJar,
-	SCRAMJETCLIENT,
-	ScramjetClient,
+	RAMJETCLIENT,
+	RamjetClient,
 	setWasm,
+	setWasmModule,
+	hasWasm,
 	Tap,
 	type CookieSyncOptions,
-	type ScramjetConfig,
-	type ScramjetContext,
+	type RamjetConfig,
+	type RamjetContext,
 	type TrackedHistoryState,
-} from "@mercuryworkshop/scramjet";
+} from "@ramjet/core";
 
 const MessagePort_postMessage = MessagePort.prototype.postMessage;
 const postMessage = (
 	port: MessagePort,
 	data: any,
-	transfer?: Transferable[]
+	transfer?: Transferable[],
 ) => {
 	MessagePort_postMessage.call(port, data, transfer as any);
 };
@@ -57,7 +59,7 @@ class RemoteTransport implements ProxyTransport {
 			"transport",
 			(data, transfer) => {
 				postMessage(port, data, transfer);
-			}
+			},
 		);
 		port.onmessageerror = (ev) => {
 			console.error("onmessageerror (this should never happen!)", ev);
@@ -74,7 +76,7 @@ class RemoteTransport implements ProxyTransport {
 		onopen: (protocol: string, extensions: string) => void,
 		onmessage: (data: Blob | ArrayBuffer | string) => void,
 		onclose: (code: number, reason: string) => void,
-		onerror: (error: string) => void
+		onerror: (error: string) => void,
 	): [
 		(data: Blob | ArrayBuffer | string) => void,
 		(code: number, reason: string) => void,
@@ -91,7 +93,7 @@ class RemoteTransport implements ProxyTransport {
 					requestHeaders,
 					port: channel.port2,
 				},
-				[channel.port2]
+				[channel.port2],
 			)
 			.then((response) => {
 				console.log(response);
@@ -122,7 +124,7 @@ class RemoteTransport implements ProxyTransport {
 						type: "data",
 						data: data,
 					},
-					data instanceof ArrayBuffer ? [data] : []
+					data instanceof ArrayBuffer ? [data] : [],
 				);
 			},
 			(code) => {
@@ -139,7 +141,7 @@ class RemoteTransport implements ProxyTransport {
 		method: string,
 		body: BodyInit | null,
 		headers: RawHeaders,
-		_signal: AbortSignal | undefined
+		_signal: AbortSignal | undefined,
 	): Promise<TransferrableResponse> {
 		return await this.rpc.call("request", {
 			remote: remote.href,
@@ -151,7 +153,7 @@ class RemoteTransport implements ProxyTransport {
 
 	async sendSetCookie(
 		cookies: Array<{ url: URL; cookie: string }>,
-		options: CookieSyncOptions = {}
+		options: CookieSyncOptions = {},
 	): Promise<void> {
 		await this.rpc.call("sendSetCookie", {
 			cookies: cookies.map(({ url, cookie }) => ({
@@ -167,16 +169,16 @@ const sw = navigator.serviceWorker.controller;
 
 type Init = {
 	config: Config;
-	sjconfig: ScramjetConfig;
+	sjconfig: RamjetConfig;
 	prefix: URL;
 	cookies: string;
 	yieldGetInjectScripts: (
 		config: Config,
-		sjconfig: ScramjetConfig,
+		sjconfig: RamjetConfig,
 		prefix: URL,
 		cookieJar: CookieJar,
 		codecEncode: (input: string) => string,
-		codecDecode: (input: string) => string
+		codecDecode: (input: string) => string,
 	) => any;
 	codecEncode: (input: string) => string;
 	codecDecode: (input: string) => string;
@@ -184,21 +186,62 @@ type Init = {
 	history: TrackedHistoryState[];
 };
 
+function isWasmModule(value: unknown): value is WebAssembly.Module {
+	return (
+		Object.prototype.toString.call(value) === "[object WebAssembly.Module]"
+	);
+}
+
+function findSharedWasmModule(): WebAssembly.Module | undefined {
+	for (const start of [window.parent, window.opener] as (Window | null)[]) {
+		let w: Window | null = start;
+		for (let depth = 0; w && depth < 16; depth++) {
+			try {
+				const candidate = (w as any)[SHARED_WASM_MODULE];
+				if (isWasmModule(candidate)) return candidate;
+				if (w.parent === w) break;
+				w = w.parent;
+			} catch {
+				break;
+			}
+		}
+	}
+	return undefined;
+}
+
+function acquireWasm(init: Init) {
+	if (hasWasm()) return;
+
+	const shared = findSharedWasmModule();
+	if (shared) {
+		setWasmModule(shared);
+		return;
+	}
+
+	const xhr = new XMLHttpRequest();
+	xhr.open("GET", init.prefix.href + init.config.binaryWasmPath, false);
+
+	xhr.overrideMimeType("text/plain; charset=x-user-defined");
+	xhr.send();
+	if (xhr.status !== 200) {
+		throw new Error(`failed to load rewriter wasm: HTTP ${xhr.status}`);
+	}
+	const text = xhr.responseText;
+	const bytes = new Uint8Array(text.length);
+	for (let i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i) & 0xff;
+	setWasm(bytes);
+}
+
 export function load(init: Init) {
-	if (SCRAMJETCLIENT in globalThis) {
-		((globalThis as any)[SCRAMJETCLIENT] as ScramjetClient).syncDocumentInit({
+	if (RAMJETCLIENT in globalThis) {
+		((globalThis as any)[RAMJETCLIENT] as RamjetClient).syncDocumentInit({
 			initHeaders: init.initHeaders,
 			history: init.history,
 			cookies: init.cookies,
 		});
 		return;
 	}
-	if (!("WASM" in self)) {
-		throw new Error("WASM not found in global scope!");
-	}
-	const wasm = Uint8Array.from(atob(self.WASM), (c) => c.charCodeAt(0));
-	delete (self as any).WASM;
-	setWasm(wasm);
+	acquireWasm(init);
 
 	new ExecutionContextWrapper(globalThis, init);
 }
@@ -211,14 +254,14 @@ function createFrameId() {
 }
 
 class ExecutionContextWrapper {
-	client!: ScramjetClient;
+	client!: RamjetClient;
 	cookieJar: CookieJar;
 	transport: RemoteTransport;
 	private handleServiceWorkerCookieMessage: (event: MessageEvent) => void;
 
 	constructor(
 		public global: typeof globalThis,
-		public init: Init
+		public init: Init,
 	) {
 		const channel = new MessageChannel();
 		this.transport = new RemoteTransport(channel.port1);
@@ -229,7 +272,7 @@ class ExecutionContextWrapper {
 					prefix: this.init.prefix.href,
 				},
 			},
-			[channel.port2]
+			[channel.port2],
 		);
 
 		this.cookieJar = new CookieJar();
@@ -282,14 +325,16 @@ class ExecutionContextWrapper {
 
 		navigator.serviceWorker?.addEventListener(
 			"message",
-			this.handleServiceWorkerCookieMessage
+			this.handleServiceWorkerCookieMessage,
 		);
 
-		this.injectScramjet();
+		this.injectRamjet();
 	}
 
-	injectScramjet() {
-		const frame = this.global.frameElement as HTMLIFrameElement | null;
+	injectRamjet() {
+		const frame = this.global.frameElement as
+			| (HTMLIFrameElement & { [CONTROLLERFRAME]?: Frame })
+			| null;
 		if (frame && !frame.name) {
 			window.name = frame.name = createFrameId();
 		}
@@ -299,15 +344,15 @@ class ExecutionContextWrapper {
 			isTopLevel = false;
 			let currentwin = this.global.window;
 			while (currentwin.parent !== currentwin) {
-				const currentclient = currentwin[SCRAMJETCLIENT];
+				const currentclient = currentwin[RAMJETCLIENT];
 				if (!currentclient) {
 					currentwin = currentwin.parent.window;
 					continue;
 				}
 				const currentFrame = currentclient.descriptors.get(
 					"window.frameElement",
-					currentwin
-				);
+					currentwin,
+				) as (HTMLIFrameElement & { [CONTROLLERFRAME]?: Frame }) | null;
 				if (currentFrame && currentFrame[CONTROLLERFRAME]) {
 					controllerFrame = currentFrame[CONTROLLERFRAME];
 					break;
@@ -315,7 +360,7 @@ class ExecutionContextWrapper {
 				currentwin = currentwin.parent.window;
 			}
 		}
-		const context: ScramjetContext = {
+		const context: RamjetContext = {
 			config: this.init.sjconfig,
 			prefix: this.init.prefix,
 			cookieJar: this.cookieJar,
@@ -326,13 +371,13 @@ class ExecutionContextWrapper {
 					this.init.prefix,
 					this.cookieJar,
 					this.init.codecEncode,
-					this.init.codecDecode
+					this.init.codecDecode,
 				),
 				codecEncode: this.init.codecEncode,
 				codecDecode: this.init.codecDecode,
 			},
 		};
-		this.client = new ScramjetClient(this.global, {
+		this.client = new RamjetClient(this.global, {
 			context,
 			transport: this.transport,
 			sendSetCookie: async (cookies, options) => {

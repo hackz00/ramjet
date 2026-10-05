@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+	<head>
+		<title>Ramjet bench harness</title>
+	</head>
+	<body>
+		<div id="status">init</div>
+		<iframe id="testframe" style="width: 1024px; height: 768px; border: 0"></iframe>
+		<script>
+			// One harness for every build: the bench also measures builds from before the rename (and the upstream
+			// baseline), whose files and globals carry the old project name. The old name is assembled from parts so
+			// the rename tooling leaves this compatibility code alone.
+			const LEGACY = "scram" + "jet";
+			const loadScript = (src) =>
+				new Promise((resolve, reject) => {
+					const s = document.createElement("script");
+					s.src = src;
+					s.onload = resolve;
+					s.onerror = () => reject(new Error("failed to load " + src));
+					document.head.appendChild(s);
+				});
+			(async () => {
+				const statusEl = document.getElementById("status");
+				const testframe = document.getElementById("testframe");
+				const query = new URLSearchParams(location.search);
+				const time = (url, start) =>
+					new Promise((resolve) => {
+						const t0 = performance.timeOrigin + performance.now();
+						const onload = () => {
+							testframe.removeEventListener("load", onload);
+							resolve({ t0, tLoad: performance.timeOrigin + performance.now() });
+						};
+						testframe.addEventListener("load", onload);
+						start(url);
+					});
+
+				if (query.get("native") === "1") {
+					// no proxy at all: the page loaded directly, to measure what the proxy costs
+					window.__benchGo = (url) => time(url, (u) => (testframe.src = u));
+					statusEl.textContent = "ready (native)";
+					window.__benchReady = true;
+					return;
+				}
+
+				try {
+					await loadScript("/ramjet/ramjet.js");
+				} catch {
+					await loadScript("/" + LEGACY + "/" + LEGACY + ".js");
+				}
+				await loadScript("/controller/controller.api.js");
+				await loadScript("/libcurl/index.js");
+				await loadScript("/assisted/assisted-transport.js");
+				const { Controller } = (window["$ramjetController"] ?? window["$" + LEGACY + "Controller"]);
+				const registration = await navigator.serviceWorker.register("/sw.js");
+				if (!navigator.serviceWorker.controller) {
+					await new Promise((resolve) => {
+						if (registration.active && navigator.serviceWorker.controller) return resolve();
+						navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true });
+					});
+				}
+				const transport =
+					query.get("transport") === "assisted"
+						? new RamjetAssisted.AssistedTransport({ url: "ws://localhost:4690/assisted" })
+						: new window.LibcurlTransport.LibcurlClient({ wisp: "ws://localhost:4601/" });
+				const controller = new Controller({
+					serviceworker: navigator.serviceWorker.controller ?? registration.active,
+					transport,
+					config: {
+						...(query.get("prefetch") === "1" || query.get("preconnect") === "1"
+							? { prefetch: { ...(query.get("prefetch") === "1" ? { enabled: true } : {}), ...(query.get("preconnect") === "1" ? { preconnect: true } : {}) } }
+							: {}),
+						...(query.get("outputcache") === "0" ? { outputCache: false } : {}),
+						...(query.get("stream") === "0" ? { streamHtml: false } : {}),
+					},
+				});
+				await controller.ready;
+				const frame = controller.createFrame(testframe);
+				// time a navigation; resolves with absolute (epoch-based) timestamps in ms
+				window.__benchGo = (url) => time(url, (u) => frame.go(u));
+				statusEl.textContent = "ready";
+				window.__benchReady = true;
+			})().catch((e) => {
+				document.getElementById("status").textContent = "error: " + e.message;
+				window.__benchError = String(e && e.stack ? e.stack : e);
+			});
+		</script>
+	</body>
+</html>

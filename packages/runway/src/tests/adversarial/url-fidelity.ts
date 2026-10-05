@@ -1,13 +1,5 @@
 import { serverTest } from "../../testcommon.ts";
 
-// Every URL a page requests is encoded into the proxy's own URL and decoded
-// again on the way out, so the origin has to receive exactly what the page asked
-// for. Double-decoding an encoded slash, dropping an empty query or reordering
-// duplicate parameters are the classic ways a proxy breaks signed URLs, REST
-// routes and pagination.
-//
-// The server echoes its raw request line, so these compare byte for byte.
-
 const rawTest = (name: string, js: string) =>
 	serverTest({
 		name,
@@ -43,7 +35,7 @@ export default [
 			assertEqual(await raw("/~tilde"), "/~tilde", "a tilde");
 			assertEqual(await raw("/a:b"), "/a:b", "a colon in the path");
 			assertEqual(await raw("/a@b"), "/a@b", "an at sign in the path");
-		`
+		`,
 	),
 	rawTest(
 		"urlfidelity-query",
@@ -59,7 +51,7 @@ export default [
 			assertEqual(await raw("/q?a=b/c"), "/q?a=b/c", "a slash in a query value");
 			assertEqual(await raw("/q?a=b=c"), "/q?a=b=c", "an equals in a query value");
 			assertEqual(await raw("/q?a=1#frag"), "/q?a=1", "the fragment is not sent to the origin");
-		`
+		`,
 	),
 	rawTest(
 		"urlfidelity-proxy-parameter-collision",
@@ -69,7 +61,7 @@ export default [
 			assertEqual(await raw("/q?$io=hijack"), "/q?$io=hijack", "a $io parameter is passed through");
 			assertEqual(await raw("/q?$module=module"), "/q?$module=module", "a $module parameter");
 			assertEqual(await raw("/q?a=1&$io=x&b=2"), "/q?a=1&$io=x&b=2", "in the middle of a real query");
-		`
+		`,
 	),
 	rawTest(
 		"urlfidelity-unicode",
@@ -81,20 +73,15 @@ export default [
 			assertEqual(await raw("/%E2%98%83"), "/%E2%98%83", "an already-encoded snowman stays as-is");
 			assertEqual(await raw("/q?emoji=" + encodeURIComponent(String.fromCodePoint(128512))),
 				"/q?emoji=%F0%9F%98%80", "an encoded emoji");
-		`
+		`,
 	),
 
-	// ------------------------------------------------------------------
 	rawTest(
-		// KNOWN FAILURE: a trailing "?" with no parameters is dropped, so the
-		// origin sees /q instead of /q?. Frameworks that branch on "was there a
-		// query string at all", and anything that canonicalises or signs the
-		// request line, see a different URL than the page asked for.
 		"urlfidelity-empty-query",
 		`
 			${RAW}
 			assertEqual(await raw("/q?"), "/q?", "an empty query string is preserved");
 			assertEqual(await raw("/q?#"), "/q?", "an empty query with an empty fragment");
-		`
+		`,
 	),
 ];

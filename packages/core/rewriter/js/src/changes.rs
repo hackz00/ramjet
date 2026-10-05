@@ -73,7 +73,7 @@ pub enum JsChangeType<'alloc: 'data, 'data> {
 	ImportFn,
 	/// replace span with `${cfg.metafn}("${cfg.base}")`
 	MetaFn,
-	/// replace span with `((t)=>$scramjet$tryset(${name},"${op}",t)||(${name}${op}t))(`
+	/// replace span with `((t)=>$ramjet$tryset(${name},"${op}",t)||(${name}${op}t))(`
 	AssignmentLeft {
 		name: Atom<'data>,
 		op: AssignmentOperator,
@@ -98,9 +98,7 @@ pub enum JsChangeType<'alloc: 'data, 'data> {
 	},
 	/// replace span with ""
 	Delete,
-	// ;cfg.cleanrestfn(restids[0]); cfg.cleanrestfn(restids[1]);
-	// or
-	// (cfg.cleanrestfn(restids[0]), cfg.cleanrestfn(restids[1]),
+
 	CleanFunction {
 		restids: Vec<Atom<'data>>,
 		expression: bool,
@@ -265,7 +263,7 @@ impl<'alloc: 'data, 'data> Transform<'data> for JsChange<'alloc, 'data> {
 			]),
 			Ty::ImportFn => LL::replace(transforms![&cfg.importfn, "(\"", &flags.base, "\","]),
 			Ty::MetaFn => LL::replace(transforms![&cfg.metafn, "(import.meta,\"", &flags.base, "\")"]),
-			Ty::SetRealmFn => LL::replace(transforms!["$scramjet$setrealmfn", "({})."]),
+			Ty::SetRealmFn => LL::replace(transforms!["$ramjet$setrealmfn", "({})."]),
 			Ty::AssignmentLeft { name, op } => LL::replace(transforms![
 				"((t)=>",
 				&cfg.trysetfn,

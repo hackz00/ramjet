@@ -1,11 +1,5 @@
 import { serverTest } from "../../testcommon.ts";
 
-// The navigations a site actually performs: submitting a form, following a
-// link, opening a popup. These are driven from the page and verified on the
-// server, so the assertion is what the origin really received - a login form
-// that posts to the wrong URL or drops its body is the kind of break that makes
-// a site unusable rather than merely wrong.
-
 export default [
 	serverTest({
 		name: "navigation-form-get",
@@ -173,7 +167,7 @@ export default [
 					"<!DOCTYPE html><html><body><script>" +
 						"opener.postMessage({from:'popup',href:location.href,hasOpener:!!window.opener},'*');" +
 						"</" +
-						"script></body></html>"
+						"script></body></html>",
 				);
 			});
 		},

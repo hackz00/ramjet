@@ -1,4 +1,4 @@
-import { type MethodsDefinition, RpcHelper } from "@mercuryworkshop/rpc";
+import { type MethodsDefinition, RpcHelper } from "@ramjet/rpc";
 import {
 	BareResponse,
 	type ProxyTransport,
@@ -6,21 +6,35 @@ import {
 import { deepmerge } from "@fastify/deepmerge";
 import {
 	CookieJar,
-	defaultConfig as scramjetDefaultConfig,
+	defaultConfig as ramjetDefaultConfig,
 	rewriteUrl,
-	ScramjetFetchHandler,
-	ScramjetHeaders,
-	setWasm,
+	RamjetFetchHandler,
+	RamjetHeaders,
+	loadWasmModule,
+	setWasmModule,
+	type PrefetchOptions,
 	Tap,
 	type CookieSyncOptions,
 	type FetchHooks,
-	type ScramjetConfig,
-	type ScramjetContext,
-	type ScramjetInterface,
-	type TrackedHistoryState,
+	type RamjetConfig,
+	type RamjetContext,
+	type RamjetInterface,
 	Plugin,
-} from "@mercuryworkshop/scramjet";
-import { CONTROLLERFRAME } from "./symbols";
+} from "@ramjet/core";
+import { CONTROLLERFRAME, SHARED_WASM_MODULE } from "./symbols";
+import {
+	findRevalidatable,
+	hashString,
+	normalizeRequestUrl,
+	planStore,
+	refreshFromNotModified,
+	storeOutput,
+	sweepOutputCache,
+	type RequestShape,
+	type Stale,
+} from "./output-cache";
+import { browserHeaders, type NavigatorLike } from "./browser-headers";
+import { VERSION } from "./version";
 import type {
 	FrameInitHooks,
 	SerializedCookieSyncEntry,
@@ -31,26 +45,35 @@ import type {
 	WebSocketMessage,
 	FrameErrorHooks,
 } from "./types";
-import { assertRuntimeScramjetVersion } from "./version";
+import { assertRuntimeRamjetVersion } from "./version";
 
 export { VERSION } from "./version";
-export { assertRuntimeScramjetVersion } from "./version";
+export { assertRuntimeRamjetVersion } from "./version";
 
 export type Config = {
 	prefix: string;
-	scramjetPath: string;
+	ramjetPath: string;
 	injectPath: string;
 	wasmPath: string;
-	virtualWasmPath: string;
+
+	binaryWasmPath: string;
+
+	prefetch?: Partial<PrefetchOptions> | false;
+
+	outputCache?: boolean;
+
+	outputCacheMaxBytes?: number;
+
+	streamHtml?: boolean;
 	codec: Record<"encode" | "decode", (input: string) => string>;
 };
 
 export const config: Config = {
 	prefix: "/~/sj/",
-	scramjetPath: "/scramjet/scramjet.js",
+	ramjetPath: "/ramjet/ramjet.js",
 	injectPath: "/controller/controller.inject.js",
-	wasmPath: "/scramjet/scramjet.wasm",
-	virtualWasmPath: "scramjet.wasm.js",
+	wasmPath: "/ramjet/ramjet.wasm",
+	binaryWasmPath: "ramjet.wasm",
 	codec: {
 		encode: (url: string) => {
 			if (!url) return url;
@@ -65,12 +88,12 @@ export const config: Config = {
 	},
 };
 
-const scramjetConfig: Partial<ScramjetConfig> = {
+const ramjetConfig: Partial<RamjetConfig> = {
 	flags: {
-		...scramjetDefaultConfig.flags,
+		...ramjetDefaultConfig.flags,
 		allowFailedIntercepts: true,
 	},
-	maskedfiles: ["inject.js", "scramjet.wasm.js"],
+	maskedfiles: ["inject.js"],
 };
 
 type PersistedCookieState = {
@@ -91,15 +114,15 @@ export class ManagedPlugin extends Plugin {
 	}
 }
 
-const COOKIE_DB_NAME = "__scramjet_controller";
+const COOKIE_DB_NAME = "__ramjet_controller";
 const COOKIE_STORE_NAME = "state";
 const COOKIE_STATE_KEY = "cookies";
-const BROADCASTCHANNEL_NAME = "__scramjet_controller_channel";
+const BROADCASTCHANNEL_NAME = "__ramjet_controller_channel";
 
 let cookieDbPromise: Promise<IDBDatabase> | null = null;
 
 function parsePersistedCookieState(
-	value: unknown
+	value: unknown,
 ): PersistedCookieState | null {
 	if (
 		typeof value !== "object" ||
@@ -169,19 +192,19 @@ async function readCookieState(): Promise<PersistedCookieState | null> {
 
 async function writeCookieState(
 	cookies: string,
-	currentUpdatedAt: number
+	currentUpdatedAt: number,
 ): Promise<number> {
 	try {
 		const db = await openCookieDatabase();
 		const transaction = db.transaction(COOKIE_STORE_NAME, "readwrite");
 		const store = transaction.objectStore(COOKIE_STORE_NAME);
 		const existing = parsePersistedCookieState(
-			await requestToPromise(store.get(COOKIE_STATE_KEY))
+			await requestToPromise(store.get(COOKIE_STATE_KEY)),
 		);
 		const updatedAt = Math.max(
 			Date.now(),
 			currentUpdatedAt + 1,
-			(existing?.updatedAt ?? 0) + 1
+			(existing?.updatedAt ?? 0) + 1,
 		);
 		const state: PersistedCookieState = {
 			updatedAt,
@@ -206,17 +229,17 @@ type ControllerInit = {
 	serviceworker: ServiceWorker;
 	transport: ProxyTransport;
 	config?: Partial<Config>;
-	scramjetConfig?: Partial<ScramjetConfig>;
+	ramjetConfig?: Partial<RamjetConfig>;
 };
 
 type FrameOptions = {
-	plugins: ManagedPlugin[];
+	plugins?: ManagedPlugin[];
 };
 
 export class Controller {
 	id: string;
 	config: Config;
-	scramjetConfig: ScramjetConfig;
+	ramjetConfig: RamjetConfig;
 	prefix: string;
 	cookieJar = new CookieJar();
 	frames: Frame[] = [];
@@ -236,7 +259,9 @@ export class Controller {
 	private cookieSyncChannel = new BroadcastChannel(BROADCASTCHANNEL_NAME);
 
 	private wasmAlreadyFetched = false;
-	private wasmPayload: string | null = null;
+	private wasmBytes: Promise<ArrayBuffer> | null = null;
+
+	private outputCacheGeneration: string;
 	private onTabChannelMessage: (e: MessageEvent) => void = (e) => {
 		this.rpc.recieve(e.data);
 	};
@@ -253,14 +278,123 @@ export class Controller {
 		void this.loadSavedCookies();
 	};
 
-	private async loadScramjetWasm() {
+	private async loadRamjetWasm() {
 		if (this.wasmAlreadyFetched) {
 			return;
 		}
 
-		const resp = await fetch(this.config.wasmPath);
-		setWasm(await resp.arrayBuffer());
+		const module = await loadWasmModule(this.config.wasmPath);
+		setWasmModule(module);
+		(globalThis as any)[SHARED_WASM_MODULE] = module;
 		this.wasmAlreadyFetched = true;
+	}
+
+	private async getWasmBytes(): Promise<ArrayBuffer> {
+		if (!this.wasmBytes) {
+			this.wasmBytes = fetch(this.config.wasmPath).then((r) => r.arrayBuffer());
+		}
+		return this.wasmBytes;
+	}
+
+	private outputShape(data: Controllerbound["request"][0]): RequestShape {
+		return {
+			url: data.rawUrl,
+			method: data.method,
+			mode: data.mode,
+			destination: data.destination,
+			cacheMode: data.cache,
+			hasRange: data.initialHeaders.some(([k]) => k.toLowerCase() === "range"),
+			hasAuthorization: data.initialHeaders.some(
+				([k]) => k.toLowerCase() === "authorization",
+			),
+		};
+	}
+
+	private sweepTimer: ReturnType<typeof setTimeout> | undefined;
+
+	private scheduleSweep(delayMs = 20_000) {
+		if (this.sweepTimer !== undefined) return;
+		this.sweepTimer = setTimeout(() => {
+			this.sweepTimer = undefined;
+			void sweepOutputCache(caches, this.outputCacheGeneration, Date.now(), {
+				maxBytes: this.config.outputCacheMaxBytes,
+			}).catch(() => {});
+		}, delayMs);
+	}
+
+	private disableOutputCacheIfHooked(frame: Frame) {
+		if (!this.outputCacheGeneration) return;
+		const { fetch, rewriter } = frame.fetchHandler.hooks;
+		const hooks = [
+			fetch.intercept,
+			fetch.request,
+			fetch.preresponse,
+			fetch.response,
+			rewriter.html.pre,
+			rewriter.html.post,
+		];
+		if (!hooks.some((hook) => Tap.hasListeners(hook))) return;
+		this.outputCacheGeneration = "";
+		void this.rpc
+			.call("setOutputCacheGeneration", { generation: "" })
+			.catch(() => {});
+	}
+
+	private cacheOutput(
+		data: Controllerbound["request"][0],
+		response: { status: number; statusText: string; body: any },
+		headers: [string, string][],
+	): any {
+		const body = response.body;
+		if (
+			this.config.outputCache === false ||
+			!this.outputCacheGeneration ||
+			!body
+		)
+			return body;
+
+		const get = (name: string) => {
+			const found = headers.find(([k]) => k.toLowerCase() === name);
+			return found ? found[1] : null;
+		};
+		const normalized = normalizeRequestUrl(data.rawUrl, this.prefix);
+		if (!normalized) return body;
+		const plan = planStore(
+			this.outputShape(data),
+			response.status,
+			get,
+			Date.now(),
+			this.outputCacheGeneration,
+		);
+		if (!plan) return body;
+
+		let toCache: BodyInit;
+		let toSend = body;
+		if (typeof body === "string" || body instanceof Blob) {
+			toCache = body;
+		} else if (body instanceof ArrayBuffer) {
+			toCache = body.slice(0);
+		} else if (ArrayBuffer.isView(body)) {
+			toCache = new Uint8Array(
+				body.buffer,
+				body.byteOffset,
+				body.byteLength,
+			).slice();
+		} else if (body instanceof ReadableStream) {
+			[toSend, toCache] = body.tee();
+		} else {
+			return body;
+		}
+		void storeOutput(
+			caches,
+			{ ...plan, ...normalized },
+			response.status,
+			response.statusText,
+			headers,
+			toCache,
+		);
+		this.scheduleSweep();
+		return toSend;
 	}
 
 	private methods: MethodsDefinition<Controllerbound> = {
@@ -275,64 +409,97 @@ export class Controller {
 			const frame = this.frames.find((f) => path.startsWith(f.prefix));
 			if (!frame) throw new Error("No frame found for request");
 			try {
-				// doesn't actually *load* every request, but hold up requests until the promise finishes
 				await this.loadSavedCookies();
 
-				if (path === frame.prefix + this.config.virtualWasmPath) {
-					if (!this.wasmPayload) {
-						const resp = await fetch(this.config.wasmPath);
-						const buf = await resp.arrayBuffer();
-						const b64 = btoa(
-							new Uint8Array(buf)
-								.reduce(
-									(data, byte) => (data.push(String.fromCharCode(byte)), data),
-									[] as any
-								)
-								.join("")
-						);
-
-						this.wasmPayload = `self.WASM = '${b64}';`;
-					}
-
+				if (path === frame.prefix + this.config.binaryWasmPath) {
 					return [
 						{
-							body: this.wasmPayload,
+							body: await this.getWasmBytes(),
 							status: 200,
 							statusText: "OK",
-							headers: [["Content-Type", "application/javascript"]],
+							headers: [
+								["Content-Type", "application/wasm"],
+								["Cache-Control", "public, max-age=31536000, immutable"],
+							],
 						},
 						[],
 					];
 				}
 
-				const sjheaders = ScramjetHeaders.fromRawHeaders(data.initialHeaders);
+				this.disableOutputCacheIfHooked(frame);
+				const fetchFor = (initialHeaders: RamjetHeaders) =>
+					frame.fetchHandler.handleFetch({
+						initialHeaders,
+						rawClientUrl: data.rawClientUrl
+							? new URL(data.rawClientUrl)
+							: undefined,
+						rawUrl: new URL(data.rawUrl),
+						rawReferrer: data.rawReferrer,
+						rawDestination: data.destination,
+						method: data.method,
+						mode: data.mode,
+						referrer: data.referrer,
+						body: data.body,
+						cache: data.cache,
+						clientId: data.clientId,
+					});
 
-				const fetchresponse = await frame.fetchHandler.handleFetch({
-					initialHeaders: sjheaders,
-					rawClientUrl: data.rawClientUrl
-						? new URL(data.rawClientUrl)
-						: undefined,
-					rawUrl: new URL(data.rawUrl),
-					rawReferrer: data.rawReferrer,
-					rawDestination: data.destination,
-					method: data.method,
-					mode: data.mode,
-					referrer: data.referrer,
-					body: data.body,
-					cache: data.cache,
-					clientId: data.clientId,
-				});
+				let stale: Stale | null = null;
+				const sjheaders = RamjetHeaders.fromRawHeaders(data.initialHeaders);
 
+				const canRevalidate =
+					(this.transport as { supportsNotModified?: boolean })
+						.supportsNotModified === true;
+				if (
+					canRevalidate &&
+					this.config.outputCache !== false &&
+					this.outputCacheGeneration
+				) {
+					stale = await findRevalidatable(caches, this.outputShape(data), {
+						controllerPrefix: this.prefix,
+						generation: this.outputCacheGeneration,
+					}).catch(() => null);
+					if (stale?.validators.etag)
+						sjheaders.set("if-none-match", stale.validators.etag);
+					if (stale?.validators.lastModified)
+						sjheaders.set("if-modified-since", stale.validators.lastModified);
+				}
+
+				let fetchresponse = await fetchFor(sjheaders);
+				if (stale && fetchresponse.status === 304) {
+					const served = await refreshFromNotModified(
+						caches,
+						stale,
+						fetchresponse.headers.toRawHeaders(),
+					).catch(() => null);
+					if (served) {
+						return [
+							{
+								body: served.body,
+								status: served.status,
+								statusText: served.statusText,
+								headers: served.headers,
+							},
+							served.body instanceof ArrayBuffer ? [served.body] : [],
+						];
+					}
+
+					fetchresponse = await fetchFor(
+						RamjetHeaders.fromRawHeaders(data.initialHeaders),
+					);
+				}
+
+				const responseHeaders = fetchresponse.headers.toRawHeaders();
+				const body = this.cacheOutput(data, fetchresponse, responseHeaders);
 				return [
 					{
-						body: fetchresponse.body,
+						body,
 						status: fetchresponse.status,
 						statusText: fetchresponse.statusText,
-						headers: fetchresponse.headers.toRawHeaders(),
+						headers: responseHeaders,
 					},
-					fetchresponse.body instanceof ReadableStream ||
-					fetchresponse.body instanceof ArrayBuffer
-						? [fetchresponse.body]
+					body instanceof ReadableStream || body instanceof ArrayBuffer
+						? [body]
 						: [],
 				];
 			} catch (e) {
@@ -363,7 +530,7 @@ export class Controller {
 							method,
 							body,
 							headers,
-							undefined
+							undefined,
 						);
 						return [response, [response.body]];
 					},
@@ -379,7 +546,7 @@ export class Controller {
 					connect: async ({ url, protocols, requestHeaders, port }) => {
 						let resolve: (arg: TransportToController["connect"][1]) => void;
 						const promise = new Promise<TransportToController["connect"][1]>(
-							(res) => (resolve = res)
+							(res) => (resolve = res),
 						);
 						const [send, close] = this.transport.connect(
 							new URL(url),
@@ -398,7 +565,7 @@ export class Controller {
 										type: "data",
 										data: data,
 									} as WebSocketMessage,
-									data instanceof ArrayBuffer ? [data] : []
+									data instanceof ArrayBuffer ? [data] : [],
 								);
 							},
 							(close, reason) => {
@@ -413,12 +580,12 @@ export class Controller {
 									result: "failure",
 									error: error,
 								});
-							}
+							},
 						);
 						port.onmessageerror = (ev) => {
 							console.error(
 								"Transport port messageerror (this should never happen!)",
-								ev
+								ev,
 							);
 						};
 						port.onmessage = ({ data }: { data: WebSocketMessage }) => {
@@ -433,12 +600,12 @@ export class Controller {
 					},
 				},
 				"transport",
-				(data, transfer) => port.postMessage(data, transfer)
+				(data, transfer) => port.postMessage(data, transfer),
 			);
 			port.onmessageerror = (ev) => {
 				console.error(
 					"Transport port messageerror (this should never happen!)",
-					ev
+					ev,
 				);
 			};
 			port.onmessage = (e) => {
@@ -449,24 +616,39 @@ export class Controller {
 	};
 
 	constructor(public init: ControllerInit) {
-		assertRuntimeScramjetVersion();
+		assertRuntimeRamjetVersion();
 		this.id = makeId();
 		this.config = deepMerge(config, init.config || {}) as Config;
-		this.scramjetConfig = deepMerge(scramjetConfig, scramjetDefaultConfig);
-		this.scramjetConfig = deepMerge(
-			this.scramjetConfig,
-			init.scramjetConfig || {}
-		) as ScramjetConfig;
+		this.ramjetConfig = deepMerge(ramjetConfig, ramjetDefaultConfig);
+		this.ramjetConfig = deepMerge(
+			this.ramjetConfig,
+			init.ramjetConfig || {},
+		) as RamjetConfig;
 		this.prefix = this.config.prefix + this.id + "/";
 		this.serviceWorkerController = init.serviceworker;
+
+		this.outputCacheGeneration = hashString(
+			[
+				VERSION,
+				$ramjet.versionInfo.version,
+
+				$ramjet.versionInfo.build,
+				$ramjet.versionInfo.date,
+				JSON.stringify(this.ramjetConfig),
+				this.config.codec.encode.toString(),
+				this.config.codec.decode.toString(),
+			].join("\n"),
+		);
 
 		this.ready = Promise.all([
 			new Promise<void>((resolve) => {
 				this.readyResolve = resolve;
 			}),
-			this.loadScramjetWasm(),
+			this.loadRamjetWasm(),
 			this.loadSavedCookies(true),
 		]).then(() => undefined);
+
+		this.scheduleSweep(15_000);
 
 		this.rpc = new RpcHelper<Controllerbound, SWbound>(
 			this.methods,
@@ -476,13 +658,13 @@ export class Controller {
 					throw new Error("Port not found");
 				}
 				this.port.postMessage(data, transfer);
-			}
+			},
 		);
 		this.transport = init.transport;
 
 		this.cookieSyncChannel.addEventListener(
 			"message",
-			this.onCookieSyncMessage
+			this.onCookieSyncMessage,
 		);
 		this.setupMessagePort();
 
@@ -514,8 +696,6 @@ export class Controller {
 			}
 
 			if (e.data.$controller$swrevive) {
-				// if we just spawned the service worker, it will send this even though it's not actually dead
-				// TODO: pretty jank, fix at some point
 				if (this.guardServiceWorkerRevive) {
 					return;
 				}
@@ -529,9 +709,7 @@ export class Controller {
 			this.port.removeEventListener("message", this.onTabChannelMessage);
 			try {
 				this.port.close();
-			} catch {
-				// ignore
-			}
+			} catch {}
 			this.port = null;
 		}
 
@@ -545,15 +723,15 @@ export class Controller {
 				$controller$init: {
 					prefix: this.prefix,
 					id: this.id,
+					generation: this.outputCacheGeneration,
 				},
 			},
-			[channel.port2]
+			[channel.port2],
 		);
 	}
 
-	// TODO: should this be a method on the cookie jar?
 	private applyCookieSyncEntries(
-		cookies: SerializedCookieSyncEntry[] | undefined
+		cookies: SerializedCookieSyncEntry[] | undefined,
 	) {
 		if (!Array.isArray(cookies)) {
 			return;
@@ -570,7 +748,7 @@ export class Controller {
 
 	async propagateCookieSync(
 		cookies: SerializedCookieSyncEntry[],
-		options: CookieSyncOptions = {}
+		options: CookieSyncOptions = {},
 	): Promise<void> {
 		if (!this.port) {
 			return;
@@ -608,7 +786,7 @@ export class Controller {
 	async persistCookies(): Promise<void> {
 		const updatedAt = await writeCookieState(
 			this.cookieJar.dump(),
-			this.cookieUpdatedAt
+			this.cookieUpdatedAt,
 		);
 		if (updatedAt <= this.cookieUpdatedAt) {
 			return;
@@ -632,7 +810,7 @@ export class Controller {
 	createFrame(element?: HTMLIFrameElement, options: FrameOptions = {}): Frame {
 		if (!this.ready) {
 			throw new Error(
-				"Controller is not ready! Try awaiting controller.wait()"
+				"Controller is not ready! Try awaiting controller.wait()",
 			);
 		}
 		element ??= document.createElement("iframe");
@@ -652,25 +830,25 @@ function base64Encode(text: string) {
 			.encode(text)
 			.reduce(
 				(data, byte) => (data.push(String.fromCharCode(byte)), data),
-				[] as any
+				[] as any,
 			)
-			.join("")
+			.join(""),
 	);
 }
 
 function yieldGetInjectScripts(
 	config: Config,
-	sjconfig: ScramjetConfig,
+	sjconfig: RamjetConfig,
 	prefix: URL,
 	cookieJar: CookieJar,
 	codecEncode: (input: string) => string,
-	codecDecode: (input: string) => string
+	codecDecode: (input: string) => string,
 ) {
-	const getInjectScripts: ScramjetInterface["getInjectScripts"] = (
+	const getInjectScripts: RamjetInterface["getInjectScripts"] = (
 		meta,
 		handler,
 		htmlcontext,
-		script
+		script,
 	) => {
 		function base64Encode(text: string) {
 			return btoa(
@@ -678,31 +856,30 @@ function yieldGetInjectScripts(
 					.encode(text)
 					.reduce(
 						(data, byte) => (data.push(String.fromCharCode(byte)), data),
-						[] as any
+						[] as any,
 					)
-					.join("")
+					.join(""),
 			);
 		}
 		return [
-			script(config.scramjetPath),
-			script(prefix.href + config.virtualWasmPath),
+			script(config.ramjetPath),
 			script(config.injectPath),
 			script(
 				"data:text/javascript;charset=utf-8;base64," +
 					base64Encode(`
-					document.querySelectorAll("script[scramjet-injected]").forEach(script => script.remove());
-					$scramjetController.load({
+					document.querySelectorAll("script[ramjet-injected]").forEach(script => script.remove());
+					$ramjetController.load({
 						config: ${JSON.stringify(config)},
 						sjconfig: ${JSON.stringify(sjconfig)},
 						prefix: new URL("${prefix.href}"),
-						cookies: ${JSON.stringify(cookieJar.dump())},
+						cookies: ${JSON.stringify(cookieJar.dumpFor(meta.base))},
 						yieldGetInjectScripts: ${yieldGetInjectScripts.toString()},
 						codecEncode: ${codecEncode.toString()},
 						codecDecode: ${codecDecode.toString()},
 						initHeaders: ${JSON.stringify(htmlcontext.headers ?? [])},
 						history: ${JSON.stringify(htmlcontext.history ?? [])},
 					})
-				`)
+				`),
 			),
 		];
 	};
@@ -712,42 +889,46 @@ function yieldGetInjectScripts(
 export class Frame {
 	id: string;
 	prefix: string;
-	fetchHandler: ScramjetFetchHandler;
+	fetchHandler: RamjetFetchHandler;
 	hooks: {
 		fetch: FetchHooks;
 		init: FrameInitHooks;
 		error: FrameErrorHooks;
 	};
 
-	get context(): ScramjetContext {
+	get context(): RamjetContext {
 		return {
-			config: this.controller.scramjetConfig,
+			config: this.controller.ramjetConfig,
 			prefix: new URL(this.prefix, location.href),
 			cookieJar: this.controller.cookieJar,
 			interface: {
 				getInjectScripts: yieldGetInjectScripts(
 					this.controller.config,
-					this.controller.scramjetConfig,
+					this.controller.ramjetConfig,
 					new URL(this.prefix, location.href),
 					this.controller.cookieJar,
 					this.controller.config.codec.encode,
-					this.controller.config.codec.decode
+					this.controller.config.codec.decode,
 				),
 				getWorkerInjectScripts: (meta, type, script) => {
 					let str = "";
 
-					str += script(this.controller.config.scramjetPath);
-					str += script(this.prefix + this.controller.config.virtualWasmPath);
+					str += script(this.controller.config.ramjetPath);
 					str += script(
 						"data:text/javascript;charset=utf-8;base64," +
 							base64Encode(`
 					(()=>{
-						const { ScramjetClient, CookieJar, setWasm } = $scramjet;
+						const { RamjetClient, CookieJar, setWasm } = $ramjet;
 
-						setWasm(Uint8Array.from(atob(self.WASM), (c) => c.charCodeAt(0)));
-						delete self.WASM;
+						// raw binary over a synchronous request: no base64 inflation, no per-byte JS decode
+						const wasmRequest = new XMLHttpRequest();
+						wasmRequest.open("GET", new URL("${this.prefix + this.controller.config.binaryWasmPath}", location.href).href, false);
+						wasmRequest.responseType = "arraybuffer";
+						wasmRequest.send();
+						if (wasmRequest.status !== 200) throw new Error("failed to load rewriter wasm: HTTP " + wasmRequest.status);
+						setWasm(new Uint8Array(wasmRequest.response));
 
-						const sjconfig = ${JSON.stringify(this.controller.scramjetConfig)};
+						const sjconfig = ${JSON.stringify(this.controller.ramjetConfig)};
 						const prefix = new URL("${this.prefix}", location.href);
 
 						const context = {
@@ -759,14 +940,14 @@ export class Frame {
 							},
 						};
 
-						const client = new ScramjetClient(globalThis, {
+						const client = new RamjetClient(globalThis, {
 							context,
 							transport: null,
 						});
 
 						client.hook();
 					})();
-					`)
+					`),
 					);
 
 					return str;
@@ -781,13 +962,17 @@ export class Frame {
 	constructor(
 		public controller: Controller,
 		public element: HTMLIFrameElement,
-		public options: FrameOptions = {}
+		public options: FrameOptions = {},
 	) {
 		this.id = makeId();
 		this.prefix = this.controller.prefix + this.id + "/";
 
-		this.fetchHandler = new ScramjetFetchHandler({
+		this.fetchHandler = new RamjetFetchHandler({
 			crossOriginIsolated: self.crossOriginIsolated,
+			prefetch: controller.config.prefetch,
+			streamHtml: controller.config.streamHtml,
+			browserHeaders: (url: URL) =>
+				browserHeaders(url, navigator as NavigatorLike),
 			context: this.context,
 			transport: controller.transport,
 			async sendSetCookie(cookies, options) {
@@ -797,7 +982,7 @@ export class Frame {
 						url: url.href,
 						cookie,
 					})),
-					options
+					options,
 				);
 			},
 			async fetchBlobUrl(url) {
@@ -820,11 +1005,11 @@ export class Frame {
 		for (const plugin of this.plugins) {
 			for (const dependency of plugin.dependencies) {
 				const dependencyPlugin = this.plugins.find(
-					(p) => p.name === dependency
+					(p) => p.name === dependency,
 				);
 				if (!dependencyPlugin) {
 					throw new Error(
-						`Dependency ${dependency} not found for plugin ${plugin.name}`
+						`Dependency ${dependency} not found for plugin ${plugin.name}`,
 					);
 				}
 			}

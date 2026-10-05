@@ -1,0 +1,27 @@
+{
+	"name": "@ramjet/bench",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"description": "Ramjet performance harness: Chromium + local fixture origin + wisp",
+	"scripts": {
+		"bench": "node --no-warnings src/run.ts",
+		"bench:compare": "node --no-warnings src/compare-cli.ts",
+		"test": "node --no-warnings --test test/"
+	},
+	"dependencies": {
+		"@mercuryworkshop/libcurl-transport": "catalog:",
+		"@mercuryworkshop/wisp-js": "catalog:",
+		"express": "^4.22.3",
+		"playwright": "^1.61.0"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/hackz00/ramjet.git",
+		"directory": "packages/bench"
+	},
+	"homepage": "https://github.com/hackz00/ramjet#readme",
+	"bugs": {
+		"url": "https://github.com/hackz00/ramjet/issues"
+	}
+}

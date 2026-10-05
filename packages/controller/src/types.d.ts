@@ -41,6 +41,7 @@ export type Controllerbound = {
 };
 
 export type SWbound = {
+	setOutputCacheGeneration: [{ generation: string }];
 	sendSetCookie: [
 		{
 			cookies: SerializedCookieSyncEntry[];
@@ -56,7 +57,6 @@ export type TransportToController = {
 			method: string;
 			body: BodyInit | null;
 			headers: RawHeaders;
-			// signal: AbortSignal | undefined
 		},
 		TransferrableResponse,
 	];
@@ -105,7 +105,7 @@ export type FrameInitHooks = {
 	pre: {
 		context: {
 			window: Window;
-			client: ScramjetClient;
+			client: RamjetClient;
 			isTopLevel: boolean;
 		};
 		props: {};
@@ -113,7 +113,7 @@ export type FrameInitHooks = {
 	post: {
 		context: {
 			window: Window;
-			client: ScramjetClient;
+			client: RamjetClient;
 			isTopLevel: boolean;
 		};
 		props: {};

@@ -1,4 +1,4 @@
-import { ScramjetClient } from "@client/index";
+import { RamjetClient } from "@client/index";
 import {
 	Number,
 	Object_keys,
@@ -8,7 +8,7 @@ import {
 	Reflect_ownKeys,
 } from "@/shared/snapshot";
 
-export default function (client: ScramjetClient) {
+export default function (client: RamjetClient) {
 	client.Trap("Element.prototype.attributes", {
 		get(ctx) {
 			const map = ctx.get() as NamedNodeMap;
@@ -60,8 +60,8 @@ export default function (client: ScramjetClient) {
 				},
 				has(target, prop) {
 					if (typeof prop === "symbol") return Reflect_has(target, prop);
-					if (prop.startsWith("scramjet-attr-")) return false;
-					if (map[prop]?.name?.startsWith("scramjet-attr-")) return false;
+					if (prop.startsWith("ramjet-attr-")) return false;
+					if (map[prop]?.name?.startsWith("ramjet-attr-")) return false;
 
 					return Reflect_has(target, prop);
 				},
@@ -73,18 +73,18 @@ export default function (client: ScramjetClient) {
 
 	client.Trap(["Attr.prototype.value", "Attr.prototype.nodeValue"], {
 		get(ctx) {
-			// eslint-disable-next-line scramjet-core/no-poisoned-ctx-value
+			// eslint-disable-next-line ramjet-core/no-poisoned-ctx-value
 			if (ctx.this?.ownerElement) {
-				// eslint-disable-next-line scramjet-core/no-poisoned-ctx-value
+				// eslint-disable-next-line ramjet-core/no-poisoned-ctx-value
 				return ctx.this.ownerElement.getAttribute(ctx.this.name);
 			}
 
 			return ctx.get();
 		},
 		set(ctx, value) {
-			// eslint-disable-next-line scramjet-core/no-poisoned-ctx-value
+			// eslint-disable-next-line ramjet-core/no-poisoned-ctx-value
 			if (ctx.this?.ownerElement) {
-				// eslint-disable-next-line scramjet-core/no-poisoned-ctx-value
+				// eslint-disable-next-line ramjet-core/no-poisoned-ctx-value
 				return ctx.this.ownerElement.setAttribute(ctx.this.name, value);
 			}
 

@@ -10,9 +10,9 @@ import {
 	isJavascriptMimeType,
 	isXmlMimeType,
 	parseMimeType,
-	Plugin as ScramjetPlugin,
-} from "@mercuryworkshop/scramjet";
-import type { Frame } from "@mercuryworkshop/scramjet-controller";
+	Plugin as RamjetPlugin,
+} from "@ramjet/core";
+import type { Frame } from "@ramjet/controller";
 import { demoSettingsStore } from "../store";
 import Monaco from "../components/Monaco";
 import { browserState } from "./BrowserView";
@@ -815,7 +815,7 @@ const RequestViewer: Component<
 	const initPlugin = (frame: Frame) => {
 		if (this.pluginReady) return;
 		this.pluginReady = true;
-		const plugin = new ScramjetPlugin("demo-request-viewer");
+		const plugin = new RamjetPlugin("demo-request-viewer");
 		plugin.tap(frame.hooks.fetch.request, (context, props) => {
 			const id = `${Date.now()}-${++this.requestSeq}`;
 			const url = props.url?.toString?.() ?? context.parsed.url.toString();

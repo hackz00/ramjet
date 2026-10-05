@@ -1,6 +1,6 @@
-import { ScramjetClient } from "@client/index";
+import { RamjetClient } from "@client/index";
 
-export default function (client: ScramjetClient, _self: GlobalThis) {
+export default function (client: RamjetClient, _self: GlobalThis) {
 	client.Proxy("Worker", {
 		construct(ctx) {
 			ctx.args[0] = client.rewriteUrl(ctx.args[0], {
@@ -9,24 +9,9 @@ export default function (client: ScramjetClient, _self: GlobalThis) {
 			});
 
 			const worker = ctx.call();
-			// const conn = new BareMuxConnection();
-
-			// (async () => {
-			// 	const port = await conn.getInnerPort();
-			// 	client.natives.call(
-			// 		"Worker.prototype.postMessage",
-			// 		worker,
-			// 		{
-			// 			$scramjet$type: "baremuxinit",
-			// 			port,
-			// 		},
-			// 		[port]
-			// 	);
-			// })();
 		},
 	});
 
-	// sharedworkers can only be constructed from window
 	client.Proxy("SharedWorker", {
 		construct(ctx) {
 			const isModule =
@@ -47,20 +32,6 @@ export default function (client: ScramjetClient, _self: GlobalThis) {
 			}
 
 			const worker = ctx.call();
-			// const conn = new BareMuxConnection();
-
-			// (async () => {
-			// 	const port = await conn.getInnerPort();
-			// 	client.natives.call(
-			// 		"MessagePort.prototype.postMessage",
-			// 		worker.port,
-			// 		{
-			// 			$scramjet$type: "baremuxinit",
-			// 			port,
-			// 		},
-			// 		[port]
-			// 	);
-			// })();
 		},
 	});
 

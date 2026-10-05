@@ -2,12 +2,13 @@ import chalk from "chalk";
 import { Command } from "commander";
 import * as prompt from "@clack/prompts";
 import { execa } from "execa";
-import { scaffold } from "./scaffold";
+import { scaffold, type PackageSource } from "./scaffold";
 
 interface CliFlags {
 	git: boolean;
 	install: boolean;
 	default: boolean;
+	source: PackageSource;
 }
 
 interface CliResults {
@@ -21,6 +22,7 @@ const defaultOpts: CliResults = {
 		git: false,
 		install: false,
 		default: false,
+		source: "auto",
 	},
 };
 
@@ -29,17 +31,22 @@ async function project() {
 	const program = new Command();
 	program.name("Create Proxy");
 	program.description(
-		"A CLI to easily get started with creating a Scramjet or Ultraviolet Proxy"
+		"A CLI to easily get started with creating a Ramjet or Ultraviolet Proxy",
 	);
 	program.argument(
 		"[dir]",
-		"The name of the program, and the directory to create"
+		"The name of the program, and the directory to create",
 	);
 	program.option("--git", "Tell the CLI to create a Git repository", false);
 	program.option("--install", "Tell the CLI to install dependencies", false);
 	program.option(
 		"-y, --default",
-		"Skip any questions a bootstrap with default options"
+		"Skip any questions a bootstrap with default options",
+	);
+	program.option(
+		"--source <source>",
+		"Where the app gets the Ramjet packages: auto, local (a checkout) or registry (npm)",
+		"auto",
 	);
 	program.parse(process.argv);
 	program.args[0] ? (cliResults.dir = program.args[0]) : void 0;
@@ -48,16 +55,17 @@ async function project() {
 		const defaultOptSpinner = prompt.spinner();
 		defaultOptSpinner.start();
 		defaultOptSpinner.message(
-			chalk.yellow("Scaffolding using ALL default options")
+			chalk.yellow("Scaffolding using ALL default options"),
 		);
 		await scaffold({
 			projectName: cliResults.dir,
 			scaffoldType: "dedicated",
+			source: cliResults.flags.source,
 		});
 		defaultOptSpinner.stop(chalk.green.bold("Scaffold complete!"));
 		return prompt.note(
 			`cd ${cliResults.dir} \nnpm run dev`,
-			chalk.bold.magenta("Done creating. Now run:")
+			chalk.bold.magenta("Done creating. Now run:"),
 		);
 	}
 
@@ -67,7 +75,7 @@ async function project() {
 				path: () =>
 					prompt.text({
 						message: chalk.green(
-							"Where would you like to create your project?"
+							"Where would you like to create your project?",
 						),
 						placeholder: "project-name",
 					}),
@@ -77,14 +85,7 @@ async function project() {
 					message: chalk.magenta("How would you like to set up this proxy?"),
 					initialValue: "dedicated",
 					maxItems: 2,
-					options: [
-						{ value: "dedicated", label: "Dedicated Server" },
-						// {
-						// 	value: "static",
-						// 	label:
-						// 		"Static (can be deployed anywhere, but requires an external Wisp server)",
-						// },
-					],
+					options: [{ value: "dedicated", label: "Dedicated Server" }],
 				}),
 		},
 		{
@@ -92,7 +93,7 @@ async function project() {
 				prompt.cancel(chalk.bold.red("Operation canceled"));
 				process.exit(0);
 			},
-		}
+		},
 	);
 
 	const initGit = await prompt.group(
@@ -110,7 +111,7 @@ async function project() {
 				prompt.cancel(chalk.bold.red("Operation canceled"));
 				process.exit(0);
 			},
-		}
+		},
 	);
 
 	const installDeps = await prompt.group(
@@ -128,7 +129,7 @@ async function project() {
 				prompt.cancel(chalk.bold.red("Operation canceled"));
 				process.exit(0);
 			},
-		}
+		},
 	);
 
 	let packageManager = "npm";
@@ -153,7 +154,7 @@ async function project() {
 					prompt.cancel(chalk.bold.red("Operation canceled"));
 					process.exit(0);
 				},
-			}
+			},
 		);
 		packageManager = pm.manager;
 	}
@@ -164,6 +165,7 @@ async function project() {
 	await scaffold({
 		projectName: initial.path ?? cliResults.dir,
 		scaffoldType: initial.type,
+		source: cliResults.flags.source,
 	});
 	scaffoldSpinner.stop(chalk.bold.green("Scaffold complete!"));
 	if (initGit.init === true || cliResults.flags.git === true) {
@@ -178,10 +180,10 @@ async function project() {
 				[
 					"commit",
 					"-m",
-					"Initial Commit from Create Proxy App",
-					'--author="create-proxy-app[bot] <cpa@mercurywork.shop>"',
+					"Initial Commit from Create Ramjet App",
+					'--author="create-ramjet-app[bot] <create-ramjet-app@users.noreply.github.com>"',
 				],
-				{ cwd: initial.path }
+				{ cwd: initial.path },
 			);
 		} catch (err: any) {}
 		gitSpinner.stop(chalk.bold.green("Git repo successfully initialized!"));
@@ -195,8 +197,8 @@ async function project() {
 		} catch (err: any) {
 			console.log(
 				chalk.yellow.bold(
-					`\n${packageManager} has failed to install dependencies. Defaulting to npm`
-				)
+					`\n${packageManager} has failed to install dependencies. Defaulting to npm`,
+				),
 			);
 			packageManager = "npm";
 			await execa("npm", ["install"], { cwd: initial.path });
@@ -206,16 +208,16 @@ async function project() {
 	switch (installDeps.install || cliResults.flags.install) {
 		case true:
 			prompt.note(
-				`cd ${initial.path ?? providedName} \n${packageManager} run dev`,
-				chalk.bold.magenta("Done creating. Now run:")
+				`cd ${initial.path ?? cliResults.dir} \n${packageManager} run dev`,
+				chalk.bold.magenta("Done creating. Now run:"),
 			);
 			break;
 		case false:
 			prompt.note(
 				`cd ${
-					initial.path ?? providedName
+					initial.path ?? cliResults.dir
 				} \n${packageManager} install \n${packageManager} run dev`,
-				chalk.bold.magenta("Done creating. Now run:")
+				chalk.bold.magenta("Done creating. Now run:"),
 			);
 			break;
 	}
@@ -224,20 +226,21 @@ async function project() {
 		spinner.start();
 		spinner.message(chalk.yellow("Scaffolding project..."));
 		await scaffold({
-			projectName: initial.path ?? providedName,
+			projectName: initial.path ?? cliResults.dir,
 			scaffoldType: initial.type,
+			source: cliResults.flags.source,
 		});
 		spinner.stop(chalk.bold.green("Scaffold complete!"));
 		prompt.note(
 			`cd ${initial.path} \nAnd get to work!`,
-			chalk.bold.magenta("Done. Now Do:")
+			chalk.bold.magenta("Done. Now Do:"),
 		);
 	}
 }
 
 async function cli() {
 	prompt.intro(
-		chalk.magenta("Welcome to Create Proxy App CLI! Let's get started")
+		chalk.magenta("Welcome to Create Ramjet App CLI! Let's get started"),
 	);
 	await project();
 }

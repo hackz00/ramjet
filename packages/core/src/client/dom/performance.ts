@@ -1,10 +1,9 @@
-import { ScramjetClient } from "@client/index";
+import { RamjetClient } from "@client/index";
 import { String } from "@/shared/snapshot";
 
-export default function (client: ScramjetClient, _self: Self) {
+export default function (client: RamjetClient, _self: Self) {
 	client.Trap("PerformanceEntry.prototype.name", {
 		get(ctx) {
-			// name is going to be a url typically
 			const name = String(ctx.get());
 
 			if (name && name.startsWith(client.context.prefix.href)) {
@@ -19,7 +18,7 @@ export default function (client: ScramjetClient, _self: Self) {
 		return entries.filter((entry) => {
 			for (const file of client.config.maskedfiles) {
 				const name = String(
-					client.descriptors.get("PerformanceEntry.prototype.name", entry)
+					client.descriptors.get("PerformanceEntry.prototype.name", entry),
 				);
 				if (name.endsWith(file)) {
 					return false;
@@ -45,6 +44,6 @@ export default function (client: ScramjetClient, _self: Self) {
 
 				return ctx.return(filterEntries(entries));
 			},
-		}
+		},
 	);
 }

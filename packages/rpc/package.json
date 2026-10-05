@@ -1,7 +1,16 @@
 {
-	"name": "@mercuryworkshop/rpc",
+	"name": "@ramjet/rpc",
 	"version": "0.0.1",
 	"type": "module",
 	"packageManager": "pnpm@10.12.1",
-	"license": "AGPL-3.0-only"
+	"license": "AGPL-3.0-only",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/hackz00/ramjet.git",
+		"directory": "packages/rpc"
+	},
+	"homepage": "https://github.com/hackz00/ramjet#readme",
+	"bugs": {
+		"url": "https://github.com/hackz00/ramjet/issues"
+	}
 }

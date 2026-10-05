@@ -4,9 +4,8 @@ import type { CDPSession } from "playwright";
 
 let testServerPort = 9100;
 
-// Helper to create a test server that serves pages with custom scheme links
 function createTestServer(
-	htmlContent: string
+	htmlContent: string,
 ): Promise<{ server: http.Server; port: number }> {
 	const port = testServerPort++;
 	return new Promise((resolve) => {
@@ -23,7 +22,6 @@ function createTestServer(
 	});
 }
 
-// Helper to set up CDP session and intercept frame navigation requests
 async function setupFrameNavigationInterception(page: any): Promise<{
 	cdp: CDPSession;
 	navigatedUrls: string[];
@@ -31,25 +29,20 @@ async function setupFrameNavigationInterception(page: any): Promise<{
 }> {
 	const navigatedUrls: string[] = [];
 
-	// Get CDP session from the page
 	const cdp = await page.context().newCDPSession(page);
 
-	// Enable Page domain
 	await cdp.send("Page.enable");
 
-	// Listen for frame navigation events - this catches attempts to navigate frames
 	cdp.on("Page.frameRequestedNavigation", (event: any) => {
 		navigatedUrls.push(event.url);
 	});
 
-	// Also listen for frameNavigated events
 	cdp.on("Page.frameNavigated", (event: any) => {
 		if (event.frame?.url) {
 			navigatedUrls.push(event.frame.url);
 		}
 	});
 
-	// And frameStartedLoading/Stopped can help
 	cdp.on("Page.navigatedWithinDocument", (event: any) => {
 		if (event.url) {
 			navigatedUrls.push(event.url);
@@ -67,7 +60,6 @@ async function setupFrameNavigationInterception(page: any): Promise<{
 }
 
 export default [
-	// Test clicking an anchor with custom scheme - capture via CDP Page domain
 	playwrightTest({
 		name: "custom-schemes-click-anchor",
 		fn: async ({ page, frame, navigate }) => {
@@ -86,27 +78,24 @@ export default [
 			try {
 				await navigate(`http://localhost:${port}/`);
 
-				// Wait for the link to be visible
 				const link = frame.locator("#custom-link");
 				await link.waitFor({ state: "visible", timeout: 5000 });
 
-				// Click the link
 				await link.click().catch(() => {});
 				await page.waitForTimeout(500);
 
-				// Check if custom-scheme URL was captured
 				const customSchemeNav = navigatedUrls.find((url) =>
-					url.startsWith("custom-scheme://")
+					url.startsWith("custom-scheme://"),
 				);
 				if (!customSchemeNav) {
 					throw new Error(
-						`Expected navigation to custom-scheme://, but got: ${navigatedUrls.join(", ")}`
+						`Expected navigation to custom-scheme://, but got: ${navigatedUrls.join(", ")}`,
 					);
 				}
 
 				if (!customSchemeNav.includes("example.com/test")) {
 					throw new Error(
-						`Expected custom-scheme://example.com/test, got: ${customSchemeNav}`
+						`Expected custom-scheme://example.com/test, got: ${customSchemeNav}`,
 					);
 				}
 			} finally {
@@ -116,7 +105,6 @@ export default [
 		},
 	}),
 
-	// Test clicking mailto: link
 	playwrightTest({
 		name: "custom-schemes-click-mailto",
 		fn: async ({ page, frame, navigate }) => {
@@ -141,17 +129,17 @@ export default [
 				await page.waitForTimeout(500);
 
 				const mailtoNav = navigatedUrls.find((url) =>
-					url.startsWith("mailto:")
+					url.startsWith("mailto:"),
 				);
 				if (!mailtoNav) {
 					throw new Error(
-						`Expected navigation to mailto:, but got: ${navigatedUrls.join(", ")}`
+						`Expected navigation to mailto:, but got: ${navigatedUrls.join(", ")}`,
 					);
 				}
 
 				if (!mailtoNav.includes("test@example.com")) {
 					throw new Error(
-						`Expected mailto:test@example.com, got: ${mailtoNav}`
+						`Expected mailto:test@example.com, got: ${mailtoNav}`,
 					);
 				}
 			} finally {
@@ -161,7 +149,6 @@ export default [
 		},
 	}),
 
-	// Test clicking tel: link
 	playwrightTest({
 		name: "custom-schemes-click-tel",
 		fn: async ({ page, frame, navigate }) => {
@@ -188,7 +175,7 @@ export default [
 				const telNav = navigatedUrls.find((url) => url.startsWith("tel:"));
 				if (!telNav) {
 					throw new Error(
-						`Expected navigation to tel:, but got: ${navigatedUrls.join(", ")}`
+						`Expected navigation to tel:, but got: ${navigatedUrls.join(", ")}`,
 					);
 				}
 
@@ -202,7 +189,6 @@ export default [
 		},
 	}),
 
-	// Test window.location assignment with custom scheme
 	playwrightTest({
 		name: "custom-schemes-location-assign",
 		fn: async ({ page, frame, navigate }) => {
@@ -232,11 +218,11 @@ export default [
 				await page.waitForTimeout(500);
 
 				const steamNav = navigatedUrls.find((url) =>
-					url.startsWith("steam://")
+					url.startsWith("steam://"),
 				);
 				if (!steamNav) {
 					throw new Error(
-						`Expected navigation to steam://, but got: ${navigatedUrls.join(", ")}`
+						`Expected navigation to steam://, but got: ${navigatedUrls.join(", ")}`,
 					);
 				}
 
@@ -250,7 +236,6 @@ export default [
 		},
 	}),
 
-	// Test location.replace with custom scheme
 	playwrightTest({
 		name: "custom-schemes-location-replace",
 		fn: async ({ page, frame, navigate }) => {
@@ -280,17 +265,17 @@ export default [
 				await page.waitForTimeout(500);
 
 				const vscodeNav = navigatedUrls.find((url) =>
-					url.startsWith("vscode://")
+					url.startsWith("vscode://"),
 				);
 				if (!vscodeNav) {
 					throw new Error(
-						`Expected navigation to vscode://, but got: ${navigatedUrls.join(", ")}`
+						`Expected navigation to vscode://, but got: ${navigatedUrls.join(", ")}`,
 					);
 				}
 
 				if (!vscodeNav.includes("file/path/to/file.ts")) {
 					throw new Error(
-						`Expected vscode://file/path/to/file.ts, got: ${vscodeNav}`
+						`Expected vscode://file/path/to/file.ts, got: ${vscodeNav}`,
 					);
 				}
 			} finally {
@@ -300,7 +285,6 @@ export default [
 		},
 	}),
 
-	// Test dynamically created anchor and click
 	playwrightTest({
 		name: "custom-schemes-dynamic-anchor-click",
 		fn: async ({ page, frame, navigate }) => {
@@ -329,30 +313,28 @@ export default [
 			try {
 				await navigate(`http://localhost:${port}/`);
 
-				// Click button to create the anchor
 				const btn = frame.locator("#create-and-click");
 				await btn.waitFor({ state: "visible", timeout: 5000 });
 				await btn.click();
 				await page.waitForTimeout(300);
 
-				// Now click the dynamically created link
 				const dynamicLink = frame.locator("#dynamic-link");
 				await dynamicLink.waitFor({ state: "visible", timeout: 5000 });
 				await dynamicLink.click().catch(() => {});
 				await page.waitForTimeout(500);
 
 				const discordNav = navigatedUrls.find((url) =>
-					url.startsWith("discord://")
+					url.startsWith("discord://"),
 				);
 				if (!discordNav) {
 					throw new Error(
-						`Expected navigation to discord://, but got: ${navigatedUrls.join(", ")}`
+						`Expected navigation to discord://, but got: ${navigatedUrls.join(", ")}`,
 					);
 				}
 
 				if (!discordNav.includes("users/123456789")) {
 					throw new Error(
-						`Expected discord://users/123456789, got: ${discordNav}`
+						`Expected discord://users/123456789, got: ${discordNav}`,
 					);
 				}
 			} finally {
@@ -362,7 +344,6 @@ export default [
 		},
 	}),
 
-	// Test form submission with custom scheme action
 	playwrightTest({
 		name: "custom-schemes-form-submit",
 		fn: async ({ page, frame, navigate }) => {
@@ -390,11 +371,11 @@ export default [
 				await page.waitForTimeout(500);
 
 				const myappNav = navigatedUrls.find((url) =>
-					url.startsWith("myapp://")
+					url.startsWith("myapp://"),
 				);
 				if (!myappNav) {
 					throw new Error(
-						`Expected navigation to myapp://, but got: ${navigatedUrls.join(", ")}`
+						`Expected navigation to myapp://, but got: ${navigatedUrls.join(", ")}`,
 					);
 				}
 
@@ -408,7 +389,6 @@ export default [
 		},
 	}),
 
-	// Test multiple custom schemes on one page
 	playwrightTest({
 		name: "custom-schemes-multiple-links",
 		fn: async ({ page, frame, navigate }) => {
@@ -431,7 +411,6 @@ export default [
 			try {
 				await navigate(`http://localhost:${port}/`);
 
-				// Click each link and verify navigation is attempted
 				const expectedSchemes = [
 					{ id: "link-steam", scheme: "steam://", expected: "steam://run/440" },
 					{
@@ -459,7 +438,6 @@ export default [
 					await page.waitForTimeout(300);
 				}
 
-				// Verify all schemes were navigated to
 				for (const { scheme, expected } of expectedSchemes) {
 					const nav = navigatedUrls.find((u) => u === expected);
 					if (!nav) {
@@ -467,7 +445,7 @@ export default [
 							.filter((u) => u.startsWith(scheme))
 							.join(", ");
 						throw new Error(
-							`Expected ${expected}, but got: ${found || "none"}. All URLs: ${navigatedUrls.join(", ")}`
+							`Expected ${expected}, but got: ${found || "none"}. All URLs: ${navigatedUrls.join(", ")}`,
 						);
 					}
 				}

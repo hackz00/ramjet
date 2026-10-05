@@ -1,17 +1,12 @@
-import { ManagedPlugin } from "@mercuryworkshop/scramjet-controller";
-import type { Frame } from "@mercuryworkshop/scramjet-controller";
+import { ManagedPlugin } from "@ramjet/controller";
+import type { Frame } from "@ramjet/controller";
 
 export type UrlWatcherOptions = {};
 
-/**
- * Runs a callback whenever the URL of a Frame changes.
- * Includes hash changes and history.pushState/replaceState.
- * For only true navigation events, use the Frame.hooks.init.post hook.
- */
 export class UrlWatcherPlugin extends ManagedPlugin {
 	constructor(
 		private onUrlChange: (url: string) => void,
-		private options: UrlWatcherOptions = {}
+		private options: UrlWatcherOptions = {},
 	) {
 		super("url-watcher", []);
 	}
@@ -30,7 +25,6 @@ export class UrlWatcherPlugin extends ManagedPlugin {
 				this.onUrlChange(props.url);
 			});
 
-			// TODO: this will probably make it fire twice if it was triggered by location.hash
 			context.window.addEventListener("hashchange", notify, { capture: true });
 		});
 	}

@@ -296,7 +296,7 @@ function testNameForPath(relPath: string) {
 function serve(
 	response: ServerResponse,
 	body: string,
-	headers: Record<string, string> = {}
+	headers: Record<string, string> = {},
 ) {
 	response.writeHead(200, {
 		"Access-Control-Allow-Origin": "*",
@@ -324,38 +324,31 @@ function replaceTokens(
 		crossHost: string;
 		searchParams?: URLSearchParams;
 		requestHeaders?: Record<string, string>;
-	}
+	},
 ) {
-	return (
-		source
-			.replaceAll("{{host}}", props.host)
-			.replaceAll("{{hosts[][www]}}", props.sameSiteHost)
-			.replaceAll("{{hosts[alt][]}}", props.crossHost)
-			.replaceAll("{{hosts[alt][www]}}", props.sameSiteHost)
-			.replaceAll("{{ports[http][0]}}", String(props.httpPort))
-			.replaceAll("{{ports[https][0]}}", String(props.httpsPort))
-			.replaceAll(
-				/\{\{GET\[([^\]]+)\]\}\}/g,
-				(_match, key: string) => props.searchParams?.get(key) ?? ""
-			)
-			// `{{headers[name]}}` echoes the value of an incoming request header.
-			// wptserve does this server-side; we mirror it here so tests like
-			// fetch/metadata/navigation.https.sub.html can assert on the page's
-			// own request headers.
-			.replaceAll(
-				/\{\{headers\[([^\]]+)\]\}\}/gi,
-				(_match, key: string) => props.requestHeaders?.[key.toLowerCase()] ?? ""
-			)
-			// Each `{{uuid()}}` should yield a distinct UUID per match, mirroring
-			// wptserve's behaviour. Use a function-replacement so the closure runs
-			// once per occurrence instead of substituting a single fixed value.
-			.replaceAll(/\{\{uuid\(\)\}\}/g, () => randomUUID())
-	);
+	return source
+		.replaceAll("{{host}}", props.host)
+		.replaceAll("{{hosts[][www]}}", props.sameSiteHost)
+		.replaceAll("{{hosts[alt][]}}", props.crossHost)
+		.replaceAll("{{hosts[alt][www]}}", props.sameSiteHost)
+		.replaceAll("{{ports[http][0]}}", String(props.httpPort))
+		.replaceAll("{{ports[https][0]}}", String(props.httpsPort))
+		.replaceAll(
+			/\{\{GET\[([^\]]+)\]\}\}/g,
+			(_match, key: string) => props.searchParams?.get(key) ?? "",
+		)
+
+		.replaceAll(
+			/\{\{headers\[([^\]]+)\]\}\}/gi,
+			(_match, key: string) => props.requestHeaders?.[key.toLowerCase()] ?? "",
+		)
+
+		.replaceAll(/\{\{uuid\(\)\}\}/g, () => randomUUID());
 }
 
 function pickFirstHeader(
 	headers: Record<string, string[] | string | undefined>,
-	name: string
+	name: string,
 ): string {
 	const value = headers[name.toLowerCase()];
 	if (Array.isArray(value)) return value[0] ?? "";
@@ -404,24 +397,17 @@ async function loadGeneratedPages() {
 		.sort();
 }
 
-/**
- * Top-level (non-generated) `fetch/metadata/*.https.sub.html` and `*.https.html`
- * pages we vendor in addition to the generated suite — see selection.ts.
- */
 async function loadPagePages() {
 	const pages: string[] = [];
 	for (const relPath of FETCH_METADATA_PAGE_FILES_LIST) {
 		if (!includeFetchMetadataPageFile(relPath)) continue;
-		// Skip non-html sidecar files (e.g. `.sub.headers`); they're served
-		// alongside but aren't independently runnable as test pages.
+
 		if (!relPath.endsWith(".html")) continue;
 		const absPath = path.join(vendorRoot, relPath);
 		try {
 			await fs.access(absPath);
 			pages.push(relPath);
-		} catch {
-			// File hasn't been vendored yet (e.g. fresh checkout); silently skip.
-		}
+		} catch {}
 	}
 	return pages.sort();
 }
@@ -440,7 +426,7 @@ function vendoredPathForRequest(pathname: string) {
 
 async function loadHeadersSidecar(
 	resolvedPath: string,
-	props: Parameters<typeof replaceTokens>[1]
+	props: Parameters<typeof replaceTokens>[1],
 ): Promise<Record<string, string>> {
 	const sidecarPath = `${resolvedPath}.sub.headers`;
 	let raw: string;
@@ -477,7 +463,7 @@ async function serveVendoredFile(
 		crossHost: string;
 		searchParams: URLSearchParams;
 		requestHeaders?: Record<string, string>;
-	}
+	},
 ) {
 	const resolvedPath = vendoredPathForRequest(requestPath);
 	if (!resolvedPath) return false;
@@ -491,8 +477,7 @@ async function serveVendoredFile(
 		throw error;
 	}
 	// Keep https:// URLs as-is — they're rerouted to the harness server by the
-	// runway cleartext-https transport. This makes the WPT tests actually exercise
-	// scheme distinctions (http vs https) for Sec-Fetch-Site.
+
 	const body = replaceTokens(source, props);
 	const sidecarHeaders = await loadHeadersSidecar(resolvedPath, props);
 	serve(response, body, {
@@ -526,15 +511,13 @@ async function ensureServer() {
 			let port = 0;
 			const handle = async (
 				request: IncomingMessage,
-				response: ServerResponse
+				response: ServerResponse,
 			) => {
 				try {
 					const hostHeader =
 						request.headers.host || FETCH_METADATA_PRIMARY_HOST;
 					const requestHost = stripPort(hostHeader);
-					// Map the requesting host to the WPT-style same-site / cross-site
-					// peers so that template substitutions in served pages resolve to
-					// hosts that are actually wired into the cleartext transport snap.
+
 					const sameSiteHost =
 						requestHost === FETCH_METADATA_PRIMARY_HOST
 							? FETCH_METADATA_SAME_SITE_HOST
@@ -545,7 +528,7 @@ async function ensureServer() {
 							: FETCH_METADATA_CROSS_SITE_HOST;
 					const requestUrl = new URL(
 						request.url || "/",
-						`http://${hostHeader}`
+						`http://${hostHeader}`,
 					);
 
 					if (requestUrl.pathname === "/resources/testharness.js") {
@@ -618,13 +601,13 @@ async function ensureServer() {
 										Object.entries(recorded).filter(
 											([k]) =>
 												k.startsWith("sec-fetch") ||
-												k === "x-scramjet-debug" ||
+												k === "x-ramjet-debug" ||
 												k === "host" ||
 												k === "origin" ||
-												k === "referer"
-										)
-									)
-								)
+												k === "referer",
+										),
+									),
+								),
 							);
 						}
 						const mime = requestUrl.searchParams.get("mime");
@@ -662,7 +645,7 @@ const data = ${payload};
 if (window.opener) window.opener.postMessage(data, "*");
 if (window.top !== window) window.top.postMessage(data, "*");
 </script>`,
-							{ "Content-Type": "text/html; charset=utf-8" }
+							{ "Content-Type": "text/html; charset=utf-8" },
 						);
 						return;
 					}
@@ -700,7 +683,7 @@ if (window.top !== window) window.top.postMessage(data, "*");
 							} else {
 								await callback.fail(
 									parsed.message || "WPT reported failure",
-									parsed.details
+									parsed.details,
 								);
 							}
 							response.writeHead(204, { "Access-Control-Allow-Origin": "*" });
@@ -709,10 +692,6 @@ if (window.top !== window) window.top.postMessage(data, "*");
 						return;
 					}
 
-					// Flatten request headers (lowercased keys, first value wins)
-					// so served pages can substitute `{{headers[name]}}` —
-					// `fetch/metadata/navigation.https.sub.html` and friends use
-					// this to assert on their own request headers.
 					const requestHeadersFlat: Record<string, string> = {};
 					for (const [k, v] of Object.entries(request.headers)) {
 						requestHeadersFlat[k.toLowerCase()] = Array.isArray(v)
@@ -745,7 +724,7 @@ if (window.top !== window) window.top.postMessage(data, "*");
 					response.end(
 						error instanceof Error
 							? error.stack || error.message
-							: String(error)
+							: String(error),
 					);
 				}
 			};
@@ -762,21 +741,17 @@ if (window.top !== window) window.top.postMessage(data, "*");
 	return sharedServerPromise;
 }
 
-// Use non-loopback fake hostnames so the WPT test setup matches its design
 // assumption that http:// destinations are non-trustworthy. The runway
-// cleartext transport rewrites all wire requests to 127.0.0.1:<port>.
+
 const FETCH_METADATA_PRIMARY_HOST = "wpt.test";
 const FETCH_METADATA_SAME_SITE_HOST = "www.wpt.test";
 const FETCH_METADATA_CROSS_SITE_HOST = "wpt-cross.test";
 
 function metadataPageTest(entryPath: string): Test {
 	const basePath = `/${entryPath}`;
-	// HTTPS variants of the WPT fetch-metadata tests run with a logical `https:`
-	// page URL so that Sec-Fetch-Site treats https↔http as a scheme change
-	// (cross-site). HTTP variants must use a non-loopback host so that
-	// destinations are non-trustworthy and Sec-Fetch-* is omitted.
+
 	const isHttpsVariant = /\.https\.(?:optional\.|tentative\.)?sub\.html$/.test(
-		entryPath
+		entryPath,
 	);
 	const scheme: "http" | "https" = isHttpsVariant ? "https" : "http";
 	const test: Test = {
@@ -788,12 +763,10 @@ function metadataPageTest(entryPath: string): Test {
 			FETCH_METADATA_SAME_SITE_HOST,
 			FETCH_METADATA_CROSS_SITE_HOST,
 		],
-		// Embedded URLs in WPT helper.sub.js include the explicit `{{ports[*][0]}}`
-		// substitution, so the loaded page URL must also include the harness
-		// port to keep same-origin classifications consistent.
+
 		useExplicitTargetPort: true,
 		path: basePath,
-		scramjetOnly: true,
+		ramjetOnly: true,
 		reloadHarness: true,
 		timeoutMs: 15000,
 		async start({ pass, fail }) {
@@ -805,7 +778,7 @@ function metadataPageTest(entryPath: string): Test {
 			const url = new URL(basePath, baseOrigin);
 			url.searchParams.set(
 				"runway_report",
-				`${baseOrigin}/__runway_report?token=${token}`
+				`${baseOrigin}/__runway_report?token=${token}`,
 			);
 			test.path = `${url.pathname}${url.search}`;
 		},

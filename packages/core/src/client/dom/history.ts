@@ -1,8 +1,8 @@
-import { ScramjetClient } from "@client/index";
+import { RamjetClient } from "@client/index";
 import { Tap } from "@/Tap";
 import { String, _URL } from "@/shared/snapshot";
 
-export default function (client: ScramjetClient, _self: Self) {
+export default function (client: RamjetClient, _self: Self) {
 	client.Proxy(
 		["History.prototype.pushState", "History.prototype.replaceState"],
 		{
@@ -13,7 +13,6 @@ export default function (client: ScramjetClient, _self: Self) {
 				if (_URL.canParse(url)) {
 					const parsedUrl = new _URL(url);
 					if (parsedUrl.origin !== relevantclient.url.origin) {
-						// TODO: we want to emulate the proper security error here. right now this will leak the origin in the error message
 						return ctx.return(undefined);
 					}
 				}
@@ -27,9 +26,9 @@ export default function (client: ScramjetClient, _self: Self) {
 					},
 					{
 						url: relevantclient.url.href,
-					}
+					},
 				);
 			},
-		}
+		},
 	);
 }

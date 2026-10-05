@@ -1,8 +1,3 @@
-/**
- * @fileoverview
- * Scramjet path export for routing functionality
- */
+declare const ramjetPath: string;
 
-declare const scramjetPath: string;
-
-export { scramjetPath };
+export { ramjetPath };

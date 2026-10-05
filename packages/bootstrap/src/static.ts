@@ -1,13 +1,12 @@
-// this file is both a service worker and client library, to minimize the number of files
-
 import { init, loadRest } from "./client";
 import { loadScript, registerSw } from "./clientcommon";
 import {
 	BootstrapOptions,
 	defaultConfig,
-	SCRAMJET_CONTROLLER_PACKAGE_NAME,
-	SCRAMJET_CONTROLLER_PINNED_MAJOR_VERSION,
-	SCRAMJET_PACKAGE_NAME,
+	RAMJET_CONTROLLER_PACKAGE_NAME,
+	RAMJET_CONTROLLER_PINNED_MAJOR_VERSION,
+	RAMJET_PACKAGE_NAME,
+	RAMJET_UTILS_PACKAGE_NAME,
 	LIBCURL_TRANSPORT_PACKAGE_NAME,
 	LIBCURL_TRANSPORT_PINNED_MAJOR_VERSION,
 	EPOXY_TRANSPORT_PACKAGE_NAME,
@@ -17,7 +16,7 @@ import {
 const isSw = "ServiceWorkerGlobalScope" in globalThis;
 
 const CDN_URL = "https://cdn.jsdelivr.net/npm/";
-const DB_NAME = "scramjet-bootstrap";
+const DB_NAME = "ramjet-bootstrap";
 const DB_VERSION = 1;
 const STORE_NAME = "files";
 
@@ -41,7 +40,6 @@ type InitDoneMessage = {
 	ready: boolean;
 };
 
-// IndexedDB helper functions
 async function openDB(): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
 		const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -93,11 +91,10 @@ async function saveFile(entry: FileEntry): Promise<void> {
 
 async function findLatestVersion(
 	packageName: string,
-	majorVersion: string
+	majorVersion: string,
 ): Promise<string> {
-	// Use jsdelivr API to find latest version
 	const response = await fetch(
-		`https://data.jsdelivr.com/v1/packages/npm/${packageName}?a`
+		`https://data.jsdelivr.com/v1/packages/npm/${packageName}?a`,
 	);
 	if (!response.ok) {
 		throw new Error(`Failed to fetch package info: ${response.statusText}`);
@@ -105,25 +102,37 @@ async function findLatestVersion(
 
 	const data = await response.json();
 	const versions = data.versions.filter((v: any) =>
-		v.version.startsWith(`${majorVersion}.`)
+		v.version.startsWith(`${majorVersion}.`),
 	);
 
 	if (versions.length === 0) {
 		throw new Error(
-			`No versions found for ${packageName} with major version ${majorVersion}`
+			`No versions found for ${packageName} with major version ${majorVersion}`,
 		);
 	}
 
-	// Versions are already sorted by jsdelivr
 	return versions[0].version;
 }
+
+const LOCAL_DIRS: Record<string, string> = {
+	[RAMJET_PACKAGE_NAME]: "core",
+	[RAMJET_CONTROLLER_PACKAGE_NAME]: "controller",
+	[RAMJET_UTILS_PACKAGE_NAME]: "utils",
+};
+const LOCAL_VERSION = "local";
+
+let localBaseUrl: string | undefined;
 
 async function downloadFile(
 	packageName: string,
 	version: string,
-	filePath: string
+	filePath: string,
 ): Promise<ArrayBuffer> {
-	const url = `${CDN_URL}${packageName}@${version}${filePath}`;
+	const localDir =
+		version === LOCAL_VERSION ? LOCAL_DIRS[packageName] : undefined;
+	const url = localDir
+		? `${localBaseUrl}${localDir}${filePath}`
+		: `${CDN_URL}${packageName}@${version}${filePath}`;
 	const response = await fetch(url);
 
 	if (!response.ok) {
@@ -138,11 +147,11 @@ async function ensureFile(
 	version: string,
 	filePath: string,
 	contentType: string,
-	routePath: string
+	routePath: string,
 ): Promise<void> {
 	const cached = await getFile(routePath);
 
-	if (cached && cached.version === version) {
+	if (cached && cached.version === version && version !== LOCAL_VERSION) {
 		console.log(`Using cached ${routePath} (${version})`);
 		return;
 	}
@@ -163,9 +172,8 @@ async function ensureFile(
 
 if (isSw) {
 	let config: BootstrapOptions;
-	let scramjetControllerLoaded = false;
+	let ramjetControllerLoaded = false;
 
-	// Set up message listener immediately on initial evaluation
 	addEventListener("message", (event) => {
 		if (typeof event.data !== "object" || event.data === null) return;
 
@@ -178,27 +186,23 @@ if (isSw) {
 		}
 	});
 
-	// Set up fetch listener immediately on initial evaluation
 	addEventListener("fetch", (event: any) => {
 		const url = new URL(event.request.url);
 		const path = url.pathname;
 
-		// Only intercept requests if we have a config
 		if (!config || !path) {
-			return; // Fall through to normal fetch
+			return;
 		}
 
 		event.respondWith(
 			(async () => {
-				// If scramjet controller is loaded, check if it should handle this request
-				if (scramjetControllerLoaded && (self as any).$scramjetController) {
-					const controller = (self as any).$scramjetController;
+				if (ramjetControllerLoaded && (self as any).$ramjetController) {
+					const controller = (self as any).$ramjetController;
 					if (controller.shouldRoute(event)) {
 						return controller.route(event);
 					}
 				}
 
-				// Try to serve bootstrap files from cache
 				const cached = await getFile(path);
 				if (cached) {
 					return new Response(cached.content, {
@@ -209,83 +213,86 @@ if (isSw) {
 					});
 				}
 
-				// Fall through to network
 				return fetch(event.request);
-			})()
+			})(),
 		);
 	});
 
 	async function initBootstrapSw(opts: InitMessage) {
-		// Merge with defaults
 		config = { ...defaultConfig, ...opts.config } as BootstrapOptions;
+		localBaseUrl = config.localBaseUrl;
 
 		try {
-			// Find latest versions
-			const controllerVersion = await findLatestVersion(
-				SCRAMJET_CONTROLLER_PACKAGE_NAME,
-				config.scramjetControllerVersionPin ||
-					SCRAMJET_CONTROLLER_PINNED_MAJOR_VERSION
-			);
+			let controllerVersion: string;
+			let ramjetVersion: string;
+			if (config.localBaseUrl) {
+				controllerVersion = LOCAL_VERSION;
+				ramjetVersion = LOCAL_VERSION;
+			} else {
+				controllerVersion = await findLatestVersion(
+					RAMJET_CONTROLLER_PACKAGE_NAME,
+					config.ramjetControllerVersionPin ||
+						RAMJET_CONTROLLER_PINNED_MAJOR_VERSION,
+				);
 
-			console.log(controllerVersion);
-			// Fetch controller to get scramjet dependency version
-			const controllerPkgUrl = `${CDN_URL}${SCRAMJET_CONTROLLER_PACKAGE_NAME}@${controllerVersion}/package.json`;
-			const controllerPkgResponse = await fetch(controllerPkgUrl);
-			const controllerPkg = await controllerPkgResponse.json();
+				console.log(controllerVersion);
 
-			console.log(controllerPkg);
-			const scramjetVersion = controllerPkg.dependencies[
-				SCRAMJET_PACKAGE_NAME
-			].replace(/^[\^~]/, "");
+				const controllerPkgUrl = `${CDN_URL}${RAMJET_CONTROLLER_PACKAGE_NAME}@${controllerVersion}/package.json`;
+				const controllerPkgResponse = await fetch(controllerPkgUrl);
+				const controllerPkg = await controllerPkgResponse.json();
 
-			// Download scramjet files
+				console.log(controllerPkg);
+				ramjetVersion = controllerPkg.dependencies[RAMJET_PACKAGE_NAME].replace(
+					/^[\^~]/,
+					"",
+				);
+			}
+
 			await ensureFile(
-				SCRAMJET_PACKAGE_NAME,
-				scramjetVersion,
-				"/dist/scramjet.js",
+				RAMJET_PACKAGE_NAME,
+				ramjetVersion,
+				"/dist/ramjet.js",
 				"application/javascript",
-				config.scramjetBundlePath
+				config.ramjetBundlePath,
 			);
 
 			await ensureFile(
-				SCRAMJET_PACKAGE_NAME,
-				scramjetVersion,
-				"/dist/scramjet.wasm",
+				RAMJET_PACKAGE_NAME,
+				ramjetVersion,
+				"/dist/ramjet.wasm",
 				"application/wasm",
-				config.scramjetWasmPath
+				config.ramjetWasmPath,
 			);
 
-			// Download controller files
 			await ensureFile(
-				SCRAMJET_CONTROLLER_PACKAGE_NAME,
+				RAMJET_CONTROLLER_PACKAGE_NAME,
 				controllerVersion,
 				"/dist/controller.api.js",
 				"application/javascript",
-				config.scramjetControllerApiPath
+				config.ramjetControllerApiPath,
 			);
 
 			await ensureFile(
-				SCRAMJET_CONTROLLER_PACKAGE_NAME,
+				RAMJET_CONTROLLER_PACKAGE_NAME,
 				controllerVersion,
 				"/dist/controller.inject.js",
 				"application/javascript",
-				config.scramjetControllerInjectPath
+				config.ramjetControllerInjectPath,
 			);
 
 			await ensureFile(
-				SCRAMJET_CONTROLLER_PACKAGE_NAME,
+				RAMJET_CONTROLLER_PACKAGE_NAME,
 				controllerVersion,
 				"/dist/controller.sw.js",
 				"application/javascript",
-				config.scramjetControllerSwPath
+				config.ramjetControllerSwPath,
 			);
 
-			// Download transport files
 			if (config.transport === "libcurl") {
 				const libcurlVersion = await findLatestVersion(
 					LIBCURL_TRANSPORT_PACKAGE_NAME,
 					config.libcurlTransportVersionPin ||
-						LIBCURL_TRANSPORT_PINNED_MAJOR_VERSION
+						LIBCURL_TRANSPORT_PINNED_MAJOR_VERSION,
 				);
 
 				await ensureFile(
@@ -293,13 +300,13 @@ if (isSw) {
 					libcurlVersion,
 					"/dist/index.js",
 					"application/javascript",
-					config.libcurlClientPath
+					config.libcurlClientPath,
 				);
 			} else if (config.transport === "epoxy") {
 				const epoxyVersion = await findLatestVersion(
 					EPOXY_TRANSPORT_PACKAGE_NAME,
 					config.epoxyTransportVersionPin ||
-						EPOXY_TRANSPORT_PINNED_MAJOR_VERSION
+						EPOXY_TRANSPORT_PINNED_MAJOR_VERSION,
 				);
 
 				await ensureFile(
@@ -307,35 +314,29 @@ if (isSw) {
 					epoxyVersion,
 					"/dist/index.js",
 					"application/javascript",
-					config.epoxyClientPath
+					config.epoxyClientPath,
 				);
 			}
 
 			console.log("Bootstrap initialization complete");
 
-			// Import scramjet controller SW script
 			try {
-				// Fetch the controller script from IndexedDB cache
-				const cachedController = await getFile(config.scramjetControllerSwPath);
+				const cachedController = await getFile(config.ramjetControllerSwPath);
 				if (cachedController) {
-					// Convert ArrayBuffer to string
 					const decoder = new TextDecoder();
 					const scriptContent = decoder.decode(cachedController.content);
 
-					// Directly evaluate the script instead of using importScripts
-					// This avoids the issue with adding event listeners after initial evaluation
 					(0, eval)(scriptContent);
 
-					scramjetControllerLoaded = true;
-					console.log("Scramjet controller loaded");
+					ramjetControllerLoaded = true;
+					console.log("Ramjet controller loaded");
 				} else {
-					console.error("Scramjet controller not found in cache");
+					console.error("Ramjet controller not found in cache");
 				}
 			} catch (error) {
-				console.error("Failed to load scramjet controller:", error);
+				console.error("Failed to load ramjet controller:", error);
 			}
 
-			// Send init done message
 			(self as any).clients.matchAll().then((clients: any[]) => {
 				clients.forEach((client: any) => {
 					client.postMessage({
@@ -359,14 +360,13 @@ if (isSw) {
 			}
 			if (!filePath) {
 				throw new Error(
-					"Could not determine bootstrap file path and none was provided!"
+					"Could not determine bootstrap file path and none was provided!",
 				);
 			}
 		}
 
 		const sw = await registerSw(filePath);
 
-		// Merge with defaults before sending to SW and using in loadRest
 		const fullConfig = { ...defaultConfig, ...opts } as BootstrapOptions;
 
 		const message: InitMessage = {

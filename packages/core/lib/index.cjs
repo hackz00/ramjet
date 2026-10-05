@@ -2,6 +2,6 @@
 
 const { resolve } = require("node:path");
 
-const scramjetPath = resolve(__dirname, "..", "dist");
+const ramjetPath = resolve(__dirname, "..", "dist");
 
-exports.scramjetPath = scramjetPath;
+exports.ramjetPath = ramjetPath;

@@ -1,14 +1,5 @@
 import { basicTest } from "../../testcommon.ts";
 
-// addEventListener is proxied so that handlers can be unwrapped and event
-// objects fixed up. The listener registry has to keep the spec's identity
-// rules: a (type, callback, capture) triple that is already registered is
-// ignored, and removeEventListener has to match on the page's own function.
-//
-// Registering the same handler twice is the standard idempotent-init pattern;
-// if it stops being a no-op, handlers fire twice - double form submits, double
-// analytics beacons, double network requests.
-
 export default [
 	basicTest({
 		name: "events-once-and-signal",
@@ -151,10 +142,7 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
 	basicTest({
-		// KNOWN FAILURE: a second registration of the same function is not
-		// recognised as a duplicate, so the handler runs twice.
 		name: "events-duplicate-listener-element",
 		js: `
 			const t = document.createElement("div");
@@ -167,8 +155,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: same on the global targets, which is where idempotent
-		// init code usually registers.
 		name: "events-duplicate-listener-global",
 		js: `
 			let w = 0;
@@ -188,7 +174,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: also with an options bag, which is the common modern form.
 		name: "events-duplicate-listener-options",
 		js: `
 			const t = document.createElement("div");

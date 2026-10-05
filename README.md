@@ -1,58 +1,23 @@
-<h1 align="center">Scramjet</h1>
-<div align="center">
-  <img src="assets/scramjet.png" height="200" />
-</div>
+# Ramjet
 
-<div align="center">
-  <a href="https://www.npmjs.com/package/@mercuryworkshop/scramjet"><img src="https://img.shields.io/npm/v/@mercuryworkshop/scramjet.svg?maxAge=3600" alt="npm version" /></a>
-  <img src="https://img.shields.io/github/issues/MercuryWorkshop/scramjet?style=flat&color=orange" />
-  <img src="https://img.shields.io/github/stars/MercuryWorkshop/scramjet?style=flat&color=orange" />
-</div>
+<img src="assets/ramjet.display.png" alt="Ramjet" width="500" />
 
----
+**CHROMIUM BROWSERS ONLY.**
 
-Scramjet is an experimental interception-based web proxy designed to evade internet censorship and bypass arbitrary browser restrictions.<br><br>
-Scramjet allows you to sandbox arbitrary web content, bypass CORS restrictions on loading websites, and instrument and debug websites inside the browser itself. This is accomplished through a combination of interception, rewriting, and sandboxing techniques. You can learn more about the technical details <a href="https://developer.puter.com/blog/how-I-ported-the-web-to-the-web/"><strong>here</strong></a>.<br><br>
+Ramjet is a performance-focused fork of [Scramjet](https://github.com/MercuryWorkshop/scramjet), with streaming HTML rewriting, persistent caching, smaller page-startup payloads and an assisted transport. Browser-side libcurl and Epoxy remain available. The assisted server handles upstream TLS, so its operator can read proxied traffic.
 
-## Supported Sites
+## Performance
 
-Some of the popular websites that Scramjet supports include:
+In the October 3, 2026 synthetic benchmarks against Scramjet 2.0.67:
 
-- [Google](https://google.com)
-- [Youtube](https://youtube.com)
-- [Instagram](https://instagram.com)
-- [ChatGPT](https://chatgpt.com)
-- [Reddit](https://reddit.com)
-- [Twitter](https://twitter.com)
-- [Discord](https://discord.com)
-- [Spotify](https://spotify.com)
-- [GeForce NOW](https://play.geforcenow.com/)
-- [now.gg](https://now.gg)
+- First paint was 5–48% lower across the tested fixtures.
+- Returning-visit load times were 30–77% lower.
+- Post-load memory was 8–16% lower; interaction latency was unchanged.
 
-## Development
+<img src="docs/perf/charts/cold-fcp.svg" alt="First-visit first paint" width="760" />
+<img src="docs/perf/charts/revisit-load.svg" alt="Returning-visit load times" width="760" />
+<img src="docs/perf/charts/interaction-memory.svg" alt="Interaction and memory measurements" width="760" />
 
-### Dependencies
+Measured on one Windows machine with Chromium and a simulated network. These figures describe the earlier measured build. Later checks found some slower timings, including about 5 ms higher returning-visit load. [Full results and methods](docs/perf/RESULTS.md).
 
-- Recent versions of `node.js` and `pnpm`
-- `rustup`
-- `wasm-bindgen`
-- [Binaryen's `wasm-opt`](https://github.com/WebAssembly/binaryen)
-- [this `wasm-snip` fork](https://github.com/r58Playz/wasm-snip)
-
-#### Building
-
-- Clone the repository with `git clone --recursive https://github.com/MercuryWorkshop/scramjet`
-- Install the dependencies with `pnpm i`
-- Change directories with `cd packages/core`
-- Build the rewriter with `pnpm rewriter:build`
-- Build Scramjet with `pnpm build`
-
-### Running Scramjet Locally
-
-You can run the Scramjet dev server when running this command at the root
-
-```sh
-pnpm dev
-```
-
-The demo page for scramjet should now be running at <http://localhost:4141> and should rebuild upon a file being changed (excluding the rewriter).
+[AGPL-3.0-only](LICENSE). Original project attribution is in [NOTICE.md](NOTICE.md).

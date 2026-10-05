@@ -1,36 +1,33 @@
 {
-	"name": "@mercuryworkshop/scramjet",
+	"name": "@ramjet/core",
 	"version": "2.0.67-alpha.2",
 	"license": "AGPL-3.0-only",
-	"description": "An experimental web proxy that aims to be the successor to Ultraviolet",
+	"description": "Browser web proxy with streaming rewriting, persistent caching and an optional assisted transport",
 	"type": "module",
-	"main": "./dist/scramjet-external.mjs",
-	"module": "./dist/scramjet-external.mjs",
+	"main": "./dist/ramjet-external.mjs",
+	"module": "./dist/ramjet-external.mjs",
 	"types": "./dist/types/typesEntry.d.ts",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/MercuryWorkshop/scramjet"
-	},
 	"scripts": {
 		"build": "cd ../.. && rspack build --mode production",
 		"rewriter:build": "cd rewriter/wasm/ && bash build.sh && cd ../../",
 		"format": "prettier --write .",
 		"lint": "eslint ./src/",
 		"lint:fix": "eslint ./src/ --fix",
-		"prepack": "RELEASE=1 npm run rewriter:build && npm run build && cp ../../README.md ./README.md"
+		"prepack": "RELEASE=1 npm run rewriter:build && npm run build && cp ../../README.md ./README.md",
+		"test": "vitest run"
 	},
 	"exports": {
 		".": {
 			"types": "./dist/types/typesEntry.d.ts",
-			"default": "./dist/scramjet-external.mjs"
+			"default": "./dist/ramjet-external.mjs"
 		},
 		"./bundled": {
 			"types": "./dist/types/index.d.ts",
-			"default": "./dist/scramjet.mjs"
+			"default": "./dist/ramjet.mjs"
 		},
 		"./bundled-wasm": {
 			"types": "./dist/types/index.d.ts",
-			"default": "./dist/scramjet_bundled.mjs"
+			"default": "./dist/ramjet_bundled.mjs"
 		},
 		"./path": {
 			"types": "./lib/index.d.ts",
@@ -39,20 +36,21 @@
 	},
 	"files": [
 		"dist",
-		"lib"
+		"lib",
+		"!dist/temp-types-build"
 	],
 	"keywords": [],
 	"author": "",
 	"devDependencies": {
-		"@eslint/eslintrc": "^3.3.1",
-		"@eslint/js": "^9.35.0",
+		"@eslint/eslintrc": "^3.3.7",
+		"@eslint/js": "^9.39.5",
 		"@types/eslint": "^9.6.1",
-		"@types/estree": "^1.0.8",
-		"@types/node": "^24.3.1",
+		"@types/estree": "^1.0.9",
+		"@types/node": "^24.19.1",
 		"@types/serviceworker": "^0.0.197",
 		"@typescript-eslint/eslint-plugin": "8.62.0",
 		"@typescript-eslint/parser": "8.62.0",
-		"eslint": "^10.1.0",
+		"eslint": "^10.12.0",
 		"tslib": "^2.8.1",
 		"typescript": "^5.9.3"
 	},
@@ -61,8 +59,17 @@
 		"dom-serializer": "^2.0.0",
 		"domhandler": "^5.0.3",
 		"domutils": "^3.2.2",
-		"htmlparser2": "catalog:",
+		"htmlparser2": "12.0.0",
 		"idb": "^8.0.3",
-		"parse-domain": "^8.2.2"
+		"parse-domain": "^8.4.0"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/hackz00/ramjet.git",
+		"directory": "packages/core"
+	},
+	"homepage": "https://github.com/hackz00/ramjet#readme",
+	"bugs": {
+		"url": "https://github.com/hackz00/ramjet/issues"
 	}
 }

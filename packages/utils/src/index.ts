@@ -1,8 +1,8 @@
-import { versionInfo } from "@mercuryworkshop/scramjet";
+import { versionInfo } from "@ramjet/core";
 import { assertDependencyVersions } from "./version";
 
 export { versionInfo };
-export { ManagedPlugin } from "@mercuryworkshop/scramjet-controller";
+export { ManagedPlugin } from "@ramjet/controller";
 export {
 	HttpCachePlugin,
 	CACHE_NAME,

@@ -1,5 +1,5 @@
 import { iswindow } from "@client/entry";
-import { ScramjetClient } from "@client/index";
+import { RamjetClient } from "@client/index";
 import { getOwnPropertyDescriptorHandler } from "@client/helpers";
 import {
 	Object_defineProperty,
@@ -9,9 +9,9 @@ import {
 	Symbol_for,
 } from "@/shared/snapshot";
 
-const realOnEvent = Symbol_for("scramjet original onevent function");
+const realOnEvent = Symbol_for("ramjet original onevent function");
 
-export default function (client: ScramjetClient, self: Self) {
+export default function (client: RamjetClient, self: Self) {
 	const handlers = {
 		message: {
 			_init() {
@@ -22,28 +22,23 @@ export default function (client: ScramjetClient, self: Self) {
 				return true;
 			},
 			ports() {
-				// don't know why i have to do this?
 				return this.ports;
 			},
 			source() {
 				if (this.source === null) return null;
 
-				// const scram: ScramjetClient = this.source[SCRAMJETCLIENT];
-
-				// if (scram) return scram.globalProxy;
-
 				return this.source;
 			},
 			origin() {
 				if (!iswindow) return "";
-				if (typeof this.data === "object" && "$scramjet$origin" in this.data)
-					return this.data.$scramjet$origin;
+				if (typeof this.data === "object" && "$ramjet$origin" in this.data)
+					return this.data.$ramjet$origin;
 
 				return client.url.origin;
 			},
 			data() {
-				if (typeof this.data === "object" && "$scramjet$data" in this.data)
-					return this.data.$scramjet$data;
+				if (typeof this.data === "object" && "$ramjet$data" in this.data)
+					return this.data.$ramjet$data;
 
 				return this.data;
 			},
@@ -74,7 +69,6 @@ export default function (client: ScramjetClient, self: Self) {
 			apply(target, that, args) {
 				const realEvent: Event = args[0];
 
-				// we only need to handle events dispatched from the browser
 				if (realEvent.isTrusted) {
 					const type = realEvent.type;
 
@@ -82,7 +76,6 @@ export default function (client: ScramjetClient, self: Self) {
 						const handler = handlers[type];
 
 						if (handler._init) {
-							// if _init returns false, we skip the event, and it never dispatches to listeners
 							if (handler._init.call(realEvent) === false) return;
 						}
 
@@ -157,7 +150,7 @@ export default function (client: ScramjetClient, self: Self) {
 			if (!arr) return;
 
 			const i = arr.findIndex(
-				(e) => e.event === ctx.args[0] && e.originalCallback === ctx.args[1]
+				(e) => e.event === ctx.args[0] && e.originalCallback === ctx.args[1],
 			);
 			if (i === -1) return;
 
@@ -189,12 +182,11 @@ export default function (client: ScramjetClient, self: Self) {
 					"Object.getOwnPropertyDescriptor",
 					null,
 					target,
-					key
+					key,
 				);
 				if (!descriptor.get || !descriptor.set || !descriptor.configurable)
 					continue;
 
-				// these are the `onmessage`, `onclick`, etc. properties
 				client.RawTrap(target, key, {
 					get(ctx) {
 						if (this[realOnEvent]) return this[realOnEvent];

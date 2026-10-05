@@ -1,11 +1,5 @@
-//! Hand-maintained shape table for the oxc AST nodes we care about.
-//!
-//! For each node type, lists its AST-typed fields with shape info so the
-//! macro can compute Expression-reachability and emit walk code.
-//!
-//! Fields that are not AST nodes (literals, bools, atoms, spans) are omitted.
-//! A field omitted here is treated as "not in R" — meaning it can be skipped
-//! freely. If oxc adds a new AST field to a type, it must be added here.
+
+
 
 #[derive(Copy, Clone, Debug)]
 pub enum Cardinality {
@@ -36,7 +30,7 @@ const fn f(name: &'static str, ty: &'static str, card: Cardinality) -> Field {
 /// as the `it: &X` parameter of a `#[coverage_checked]` method must be here,
 /// along with every node type transitively reachable from those.
 pub const NODES: &[NodeDef] = &[
-    // ===== top-level / structural =====
+
     NodeDef {
         name: "Program",
         fields: &[
@@ -75,7 +69,7 @@ pub const NODES: &[NodeDef] = &[
         fields: &[],
         variants: &[],
     },
-    // ===== Expression umbrella — this is the "R-root" =====
+
     NodeDef {
         name: "Expression",
         fields: &[],
@@ -209,7 +203,7 @@ pub const NODES: &[NodeDef] = &[
         fields: &[],
         variants: &[],
     },
-    // ===== functions =====
+
     NodeDef {
         name: "FunctionExpression",
         fields: &[
@@ -310,7 +304,7 @@ pub const NODES: &[NodeDef] = &[
         ],
         variants: &[],
     },
-    // ===== unary/update/etc. =====
+
     NodeDef {
         name: "UnaryExpression",
         fields: &[f("argument", "Expression", Cardinality::One)],
@@ -397,7 +391,7 @@ pub const NODES: &[NodeDef] = &[
         ],
         variants: &[],
     },
-    // ===== calls / members =====
+
     NodeDef {
         name: "CallExpression",
         fields: &[
@@ -476,7 +470,7 @@ pub const NODES: &[NodeDef] = &[
         ],
         variants: &[],
     },
-    // ===== assignment targets =====
+
     NodeDef {
         name: "AssignmentTarget",
         fields: &[],
@@ -567,7 +561,7 @@ pub const NODES: &[NodeDef] = &[
         ],
         variants: &[],
     },
-    // ===== binding patterns =====
+
     NodeDef {
         name: "BindingPattern",
         fields: &[f("kind", "BindingPatternKind", Cardinality::One)],
@@ -615,13 +609,12 @@ pub const NODES: &[NodeDef] = &[
         ],
         variants: &[],
     },
-    // ===== statements =====
+
     NodeDef {
         name: "Statement",
         fields: &[],
         variants: &[
-            // Ordered so that BFS for the snippet generator picks the most
-            // readable witness path first.
+
             "ExpressionStatement",
             "BlockStatement",
             "IfStatement",
@@ -740,10 +733,7 @@ pub const NODES: &[NodeDef] = &[
     NodeDef {
         name: "ForStatementLeft",
         fields: &[],
-        // AssignmentTarget first so the snippet generator produces a valid
-        // for-of/for-in left (the VariableDeclaration template carries a
-        // trailing `;` and would render `for(var x=…; of …)` which is
-        // invalid syntax).
+
         variants: &["AssignmentTarget", "VariableDeclaration"],
     },
     NodeDef {

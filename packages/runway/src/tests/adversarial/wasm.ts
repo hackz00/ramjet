@@ -1,14 +1,5 @@
 import { serverTest } from "../../testcommon.ts";
 
-// WebAssembly is unusually strict about what the network layer hands it:
-// instantiateStreaming/compileStreaming refuse anything that isn't served as
-// application/wasm, and the bytes have to arrive untouched. A proxy that
-// rewrites bodies or normalises content types breaks every wasm-backed library
-// (ffmpeg.wasm, sql.js, PDF and image codecs, game engines).
-//
-// Nothing here diverges - this is regression cover for an area with no tests.
-
-// a minimal module exporting f42() -> i32, returning 42
 const WASM = Buffer.from([
 	0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x05, 0x01, 0x60, 0x00,
 	0x01, 0x7f, 0x03, 0x02, 0x01, 0x00, 0x07, 0x07, 0x01, 0x03, 0x66, 0x34, 0x32,
@@ -48,7 +39,7 @@ export default [
 			const { instance, module } = await WebAssembly.instantiateStreaming(fetch("/mod.wasm"));
 			assertEqual(instance.exports.f42(), 42, "instantiateStreaming compiled and ran the module");
 			assert(module instanceof WebAssembly.Module, "a Module came back");
-		`
+		`,
 	),
 	wasmTest(
 		"wasm-compile-streaming",
@@ -58,7 +49,7 @@ export default [
 			assertEqual(instance.exports.f42(), 42, "compileStreaming then instantiate");
 			assertDeepEqual(WebAssembly.Module.exports(mod).map((e) => e.name), ["f42"], "Module.exports");
 			assertDeepEqual(WebAssembly.Module.imports(mod), [], "Module.imports");
-		`
+		`,
 	),
 	wasmTest(
 		"wasm-bytes-untouched",
@@ -70,7 +61,7 @@ export default [
 			const { instance } = await WebAssembly.instantiate(buf);
 			assertEqual(instance.exports.f42(), 42, "instantiate from an ArrayBuffer");
 			assert(await WebAssembly.validate(buf), "WebAssembly.validate");
-		`
+		`,
 	),
 	wasmTest(
 		"wasm-content-type-preserved",
@@ -79,7 +70,7 @@ export default [
 			assertEqual(r.headers.get("content-type"), "application/wasm",
 				"the wasm content-type survives the proxy - streaming compilation depends on it");
 			assertEqual((await r.arrayBuffer()).byteLength, 36, "byte length");
-		`
+		`,
 	),
 	wasmTest(
 		"wasm-wrong-mime-rejects",
@@ -90,6 +81,6 @@ export default [
 			assert(err, "a non-wasm MIME type must reject");
 			assert(String(err.message).toLowerCase().includes("mime") || err instanceof TypeError,
 				"rejection reason: " + err.message);
-		`
+		`,
 	),
 ];

@@ -5,16 +5,17 @@ import {
 } from "@mercuryworkshop/proxy-transports";
 import {
 	BodyType,
-	ScramjetFetchHandler,
-	ScramjetFetchParsed,
-	ScramjetFetchRequest,
-	ScramjetFetchResponse,
+	RamjetFetchHandler,
+	RamjetFetchParsed,
+	RamjetFetchRequest,
+	RamjetFetchResponse,
 } from ".";
 import { rewriteUrl, unrewriteBlob, unrewriteUrl } from "@rewriters/url";
 import { QP, parseRequest } from "./parse";
-import { ScramjetHeaders } from "@/shared";
+import { RamjetHeaders } from "@/shared";
 import { isDocument, isRedirect, normalizeContentType } from "./util";
 import { rewriteBody } from "./body";
+import { needsZeroContentLength, prepareUpload } from "./upload";
 import { Tap } from "@/Tap";
 import {
 	computeFetchSite,
@@ -25,13 +26,37 @@ import {
 import { _URL } from "@/shared/snapshot";
 
 export async function doHandleFetch(
-	handler: ScramjetFetchHandler,
-	request: ScramjetFetchRequest
-): Promise<ScramjetFetchResponse> {
+	handler: RamjetFetchHandler,
+	request: RamjetFetchRequest,
+): Promise<RamjetFetchResponse> {
+	if (request.prefetch) return handleFetchInner(handler, request);
+
+	handler.prefetcher.beginReal();
+	try {
+		return await handleFetchInner(handler, request);
+	} finally {
+		handler.prefetcher.endReal();
+	}
+}
+
+async function handleFetchInner(
+	handler: RamjetFetchHandler,
+	request: RamjetFetchRequest,
+): Promise<RamjetFetchResponse> {
 	const parsed = parseRequest(request, handler);
+
+	if (!request.prefetch && parsed.destination === "document") {
+		handler.prefetcher.cancelQueued();
+	}
 
 	if (isBlobOrDataUrl(parsed.url)) {
 		return handleBlobOrDataUrlFetch(handler, request, parsed);
+	}
+
+	const prefetched = handler.prefetcher.take(request, parsed);
+	if (prefetched) {
+		const hit = await prefetched;
+		if (hit) return hit;
 	}
 
 	const interceptCtx: typeof handler.hooks.fetch.intercept.context = {
@@ -42,7 +67,7 @@ export async function doHandleFetch(
 	await Tap.dispatch(
 		handler.hooks.fetch.intercept,
 		interceptCtx,
-		interceptProps
+		interceptProps,
 	);
 	if (interceptProps.response) {
 		return interceptProps.response;
@@ -51,7 +76,7 @@ export async function doHandleFetch(
 	if (parsed.hadExtraParams && isDocument(parsed)) {
 		const location = rewriteUrl(parsed.url, handler.context, parsed.meta);
 		if (location !== request.rawUrl.href) {
-			const responseHeaders = new ScramjetHeaders();
+			const responseHeaders = new RamjetHeaders();
 			responseHeaders.set("location", location);
 			return {
 				body: "",
@@ -67,15 +92,13 @@ export async function doHandleFetch(
 	let responseBody: BodyType;
 	const response = await doNetworkFetch(handler, request, parsed, newheaders);
 
-	// set-cookie needs to take the raw headers. after this, we can flatten the headers into a ScramjetHeaders object
 	await handleCookies(handler, request, parsed, response.rawHeaders);
 
 	if (isDocument(parsed)) {
-		// for document.referer
 		parsed.trackedClient?.history.push({
 			url: parsed.url.href,
-			refererPolicy: ScramjetHeaders.fromRawHeaders(response.rawHeaders).get(
-				"referrer-policy"
+			refererPolicy: RamjetHeaders.fromRawHeaders(response.rawHeaders).get(
+				"referrer-policy",
 			),
 		});
 	}
@@ -84,17 +107,13 @@ export async function doHandleFetch(
 		handler,
 		request,
 		parsed,
-		response.rawHeaders
+		response.rawHeaders,
 	);
 
 	if (isRedirect(response)) {
 		const location = new _URL(responseHeaders.get("location"));
 		const referer = newheaders.get("Referer");
 
-		// Compute the page (initiator) URL once. The initiator never changes
-		// through a redirect chain, so prefer the propagated `sj$io` value if
-		// the chain has already started; otherwise fall back to rawClientUrl
-		// or rawReferrer (which point at the page for the *first* hop).
 		let initiatorOriginUrl: URL | undefined;
 		if (parsed.fetchInitiatorOrigin) {
 			try {
@@ -114,18 +133,12 @@ export async function doHandleFetch(
 					: undefined;
 		}
 
-		// Cross-site redirect poisoning (SameSite): if this hop was cross-site, or a
-		// previous hop already was, propagate the flag so the final destination
-		// enforces cross-site SameSite restrictions.
 		const crossSiteRedirect =
 			parsed.crossSiteRedirect ||
 			(!!initiatorOriginUrl &&
 				registrableDomainForRedirect(initiatorOriginUrl.hostname) !==
 					registrableDomainForRedirect(parsed.url.hostname));
 
-		// Sec-Fetch-Site chain state: combine the worst classification seen so
-		// far with the relation between the initiator and *this* hop's URL.
-		// Once "cross-site" appears, it sticks for the rest of the chain.
 		let propagatedFetchSite: "same-site" | "cross-site" | undefined;
 		if (initiatorOriginUrl) {
 			const hopSite = computeFetchSite(initiatorOriginUrl, parsed.url);
@@ -151,9 +164,6 @@ export async function doHandleFetch(
 	if (response.body && !isRedirect(response)) {
 		responseBody = await rewriteBody(handler, request, parsed, response);
 
-		// After rewriting HTML, the body is a JS string which will be encoded as
-		// UTF-8 by the Response constructor. Normalize the Content-Type charset so
-		// the browser doesn't try to decode UTF-8 bytes with the original encoding.
 		normalizeContentType(parsed, responseHeaders);
 	}
 
@@ -172,17 +182,30 @@ export async function doHandleFetch(
 
 	await Tap.dispatch(handler.hooks.fetch.response, respcontext, respprops);
 
+	handler.prefetcher.observe(request.rawUrl.href, respprops.response.headers);
+
 	return respprops.response;
 }
 
 export async function doNetworkFetch(
-	handler: ScramjetFetchHandler,
-	request: ScramjetFetchRequest,
-	parsed: ScramjetFetchParsed,
-	newheaders: ScramjetHeaders
+	handler: RamjetFetchHandler,
+	request: RamjetFetchRequest,
+	parsed: RamjetFetchParsed,
+	newheaders: RamjetHeaders,
 ): Promise<BareResponse> {
+	for (const [name, value] of handler.browserHeaders?.(parsed.url) ?? []) {
+		if (!newheaders.has(name)) newheaders.set(name, value);
+	}
+	const hasBody = request.method !== "GET" && request.method !== "HEAD";
+	const body = hasBody ? await prepareUpload(request.body) : request.body;
+	if (
+		needsZeroContentLength(request.method, body) &&
+		!newheaders.has("content-length")
+	) {
+		newheaders.set("content-length", "0");
+	}
 	const init = {
-		body: request.body,
+		body,
 		headers: newheaders.toRawHeaders(),
 		method: request.method,
 		redirect: "manual",
@@ -203,10 +226,8 @@ export async function doNetworkFetch(
 	if (reqprops.earlyResponse) {
 		const resp = reqprops.earlyResponse;
 		if ("rawHeaders" in resp) {
-			// it's a bare response
 			earlyResponse = resp;
 		} else {
-			// it's a native response, convert it
 			earlyResponse = BareResponse.fromNativeResponse(resp);
 		}
 	} else {
@@ -225,7 +246,7 @@ export async function doNetworkFetch(
 	await Tap.dispatch(
 		handler.hooks.fetch.preresponse,
 		prerespcontext,
-		prerespprops
+		prerespprops,
 	);
 
 	return prerespprops.response;
@@ -236,23 +257,23 @@ function isBlobOrDataUrl(url: _URL): boolean {
 }
 
 async function handleBlobOrDataUrlFetch(
-	handler: ScramjetFetchHandler,
-	request: ScramjetFetchRequest,
-	parsed: ScramjetFetchParsed
-): Promise<ScramjetFetchResponse> {
+	handler: RamjetFetchHandler,
+	request: RamjetFetchRequest,
+	parsed: RamjetFetchParsed,
+): Promise<RamjetFetchResponse> {
 	let dataUrl = request.rawUrl.pathname.substring(
-		handler.context.prefix.pathname.length
+		handler.context.prefix.pathname.length,
 	);
 	let response: BareResponse;
 
 	if (dataUrl.startsWith("blob:")) {
 		dataUrl = unrewriteBlob(dataUrl, handler.context, parsed.meta);
 		response = BareResponse.fromNativeResponse(
-			await handler.fetchBlobUrl(dataUrl)
+			await handler.fetchBlobUrl(dataUrl),
 		);
 	} else {
 		response = BareResponse.fromNativeResponse(
-			await handler.fetchDataUrl(dataUrl)
+			await handler.fetchDataUrl(dataUrl),
 		);
 	}
 
@@ -262,12 +283,11 @@ async function handleBlobOrDataUrlFetch(
 			handler,
 			request,
 			parsed,
-			response as BareResponse
+			response as BareResponse,
 		);
 	}
-	const headers = ScramjetHeaders.fromRawHeaders(response.rawHeaders);
+	const headers = RamjetHeaders.fromRawHeaders(response.rawHeaders);
 
-	// blob urls actually *can* set charsets, so we need to normalize them if it goes down the html path
 	normalizeContentType(parsed, headers);
 
 	if (handler.crossOriginIsolated) {
@@ -285,7 +305,6 @@ async function handleBlobOrDataUrlFetch(
 	};
 }
 
-/** Simplified registrable-domain check used for cross-site redirect detection. */
 export function registrableDomainForRedirect(hostname: string): string {
 	if (/^[\d.]+$/.test(hostname) || hostname.includes(":")) return hostname;
 	const labels = hostname.split(".");
@@ -296,10 +315,10 @@ export function registrableDomainForRedirect(hostname: string): string {
 }
 
 async function handleCookies(
-	handler: ScramjetFetchHandler,
-	request: ScramjetFetchRequest,
-	parsed: ScramjetFetchParsed,
-	rawHeaders: RawHeaders
+	handler: RamjetFetchHandler,
+	request: RamjetFetchRequest,
+	parsed: RamjetFetchParsed,
+	rawHeaders: RawHeaders,
 ) {
 	const cookies = [];
 

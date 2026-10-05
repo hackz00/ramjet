@@ -12,7 +12,12 @@
 		"allowImportingTsExtensions": true,
 		"noEmit": false
 	},
-	"include": ["src/index.ts", "src/global.d.ts", "src/typesEntry.ts"],
+	"include": [
+		"src/index.ts",
+		"src/global.d.ts",
+		"src/typesEntry.ts",
+		"src/build.d.ts"
+	],
 	"exclude": [
 		"**/*.test.ts",
 		"node_modules",

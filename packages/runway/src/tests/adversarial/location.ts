@@ -1,12 +1,5 @@
 import { basicTest } from "../../testcommon.ts";
 
-// The location proxy is the single most-read API on the web: every router,
-// analytics tag and CDN loader decomposes it. It has to look like a real
-// Location and it must never hand back a proxy URL.
-//
-// The harness loads the page with a `#runway_token=…` fragment, so these tests
-// avoid asserting an absolute href and check internal consistency instead.
-
 const setForm = (name: string, code: string) =>
 	basicTest({
 		name: `location-set-${name}`,
@@ -79,7 +72,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: ancestorOrigins is missing from the proxy entirely.
 		name: "location-ancestororigins",
 		js: `
 			assert("ancestorOrigins" in location, "ancestorOrigins must exist");
@@ -88,8 +80,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: the proxy carries an own `constructor` property that a
-		// real Location does not - a one-line fingerprint.
 		name: "location-own-property-names",
 		js: `
 			assertDeepEqual(
@@ -144,9 +134,6 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
-	// mutation
-	// ------------------------------------------------------------------
 	basicTest({
 		name: "location-hash-roundtrip",
 		js: `
@@ -187,9 +174,6 @@ export default [
 	setForm("assign", `location.assign("#target");`),
 	setForm("replace", `location.replace("#target");`),
 
-	// ------------------------------------------------------------------
-	// history - the router path
-	// ------------------------------------------------------------------
 	basicTest({
 		name: "location-history-pushstate",
 		js: `

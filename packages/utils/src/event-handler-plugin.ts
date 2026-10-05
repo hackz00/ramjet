@@ -1,5 +1,5 @@
-import { ManagedPlugin } from "@mercuryworkshop/scramjet-controller";
-import type { Frame } from "@mercuryworkshop/scramjet-controller";
+import { ManagedPlugin } from "@ramjet/controller";
+import type { Frame } from "@ramjet/controller";
 import {
 	setupAlwaysLastBubble,
 	type AddAlwaysLastEventListener,
@@ -9,14 +9,9 @@ export type { AddAlwaysLastEventListener } from "./alwaysLastBubble";
 export { setupAlwaysLastBubble } from "./alwaysLastBubble";
 
 export type EventHandlerPluginOptions = {
-	/** Bubble-phase event types to track. Defaults to click, auxclick, and contextmenu. */
 	events?: string[];
 };
 
-/**
- * Allows you to register an event listener on an element, such that it will only run after the page's own listeners (including after stopPropagation).
- * This allows you to fake "native" browser behavior with ease
- */
 export class EventHandlerPlugin extends ManagedPlugin {
 	private addAlwaysLastEventListeners: Map<Window, AddAlwaysLastEventListener> =
 		new Map();
@@ -32,7 +27,7 @@ export class EventHandlerPlugin extends ManagedPlugin {
 		this.tap(frame.hooks.init.post, (context) => {
 			this.addAlwaysLastEventListeners.set(
 				context.window,
-				setupAlwaysLastBubble(context.client, this.eventsToCapture)
+				setupAlwaysLastBubble(context.client, this.eventsToCapture),
 			);
 		});
 	}
@@ -44,7 +39,7 @@ export class EventHandlerPlugin extends ManagedPlugin {
 
 	private getWindow(target: EventTarget): Window | null {
 		if (!target) return null;
-		// TODO: object safety
+
 		// @ts-expect-error
 		if ("ownerDocument" in target && target.ownerDocument.defaultView) {
 			// @ts-expect-error
@@ -67,7 +62,7 @@ export class EventHandlerPlugin extends ManagedPlugin {
 	addEventListener<T extends Event>(
 		target: EventTarget,
 		eventName: string,
-		listener: (e: T) => void
+		listener: (e: T) => void,
 	): void {
 		const window = this.getWindow(target);
 		if (!window) {
@@ -78,7 +73,7 @@ export class EventHandlerPlugin extends ManagedPlugin {
 			this.addAlwaysLastEventListeners.get(window);
 		if (!addAlwaysLastEventListener) {
 			throw new Error(
-				"somehow the realm of the target never had addAlwaysLastEventListener installed"
+				"somehow the realm of the target never had addAlwaysLastEventListener installed",
 			);
 		}
 		addAlwaysLastEventListener(target, eventName, listener);

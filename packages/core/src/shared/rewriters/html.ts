@@ -4,11 +4,12 @@ import render from "dom-serializer";
 import { URLMeta, rewriteUrl } from "@rewriters/url";
 import { rewriteCss } from "@rewriters/css";
 import { rewriteJs } from "@rewriters/js";
-import { ScramjetContext } from "@/shared";
+import { RamjetContext } from "@/shared";
 import { htmlRules } from "@/shared/htmlRules";
 import { parseDeclarativeRefresh } from "@/shared/refresh";
 import { bytesToBase64 } from "@/shared/util";
 import { Tap } from "@/Tap";
+import { noteHtmlResource } from "@rewriters/hints";
 import { RawHeaders } from "@mercuryworkshop/proxy-transports";
 import { TrackedHistoryState } from "@/fetch";
 import {
@@ -33,15 +34,14 @@ import {
 export type ForeignContext = "svg" | "math" | "html";
 
 export type HtmlContext = {
-	// should we inject scramjet scripts at the top of the document?
 	loadScripts: boolean;
-	// did the document come from the service worker, or from document.write/innerHTML?
+
 	inline: boolean;
-	// for worker originating documents, the source URL, otherwise the url of the page that triggered the rewrite
+
 	source: string;
-	// for api originating documents, the name of the api that triggered the rewrite
+
 	apisource?: string;
-	// response headers for worker originating documents
+
 	headers?: RawHeaders;
 	foreignContext?: ForeignContext;
 	history?: TrackedHistoryState[];
@@ -72,9 +72,9 @@ export class IncrementalHtmlRewriter {
 	private ended = false;
 
 	constructor(
-		private readonly context: ScramjetContext,
+		private readonly context: RamjetContext,
 		private readonly meta: URLMeta,
-		private readonly htmlcontext: HtmlContext
+		private readonly htmlcontext: HtmlContext,
 	) {
 		this.handler = new DomHandler(undefined, undefined, (element) => {
 			this.completedElements.add(element);
@@ -143,7 +143,7 @@ export class IncrementalHtmlRewriter {
 				node,
 				this.context,
 				this.meta,
-				this.htmlcontext
+				this.htmlcontext,
 			);
 			this.rewrittenNodes.set(node, rewritten);
 		}
@@ -154,9 +154,9 @@ export class IncrementalHtmlRewriter {
 
 function rewriteHtmlInner(
 	html: string | ChildNode,
-	context: ScramjetContext,
+	context: RamjetContext,
 	meta: URLMeta,
-	htmlcontext: HtmlContext
+	htmlcontext: HtmlContext,
 ) {
 	if (typeof html !== "string") {
 		html = serializeHtmlNode(html);
@@ -177,7 +177,7 @@ function rewriteHtmlInner(
 			htmlcontext,
 			origHtml: html,
 		},
-		undefined
+		undefined,
 	);
 	traverseParsedHtml(handler.root, context, meta);
 
@@ -198,12 +198,11 @@ function rewriteHtmlInner(
 			if (child.type === ElementType.Tag && child.name === "html") {
 				htmlRoot = child as Element;
 			} else {
-				// there's a child of the root that isn't an html element or a doctype/comment/text
 				return true;
 			}
 		}
 
-		if (!htmlRoot) return true; // no html tag or it's somewhere else other than first child
+		if (!htmlRoot) return true;
 
 		for (const child of htmlRoot.childNodes) {
 			if (
@@ -216,15 +215,12 @@ function rewriteHtmlInner(
 
 			if (child.type === ElementType.Tag && child.name === "head") {
 				if (bodyElement) {
-					// head comes after body
 					return true;
 				}
 				headElement = child as Element;
 			} else if (child.type === ElementType.Tag && child.name === "body") {
 				bodyElement = child as Element;
 			} else {
-				// there's a child of html that isn't head or body
-				// fine if head already exists, bad if it doesn't
 				if (!headElement) {
 					return true;
 				}
@@ -238,20 +234,19 @@ function rewriteHtmlInner(
 
 	if (htmlcontext.loadScripts) {
 		const script = (src: string) =>
-			new Element("script", { src, "scramjet-injected": "true" });
+			new Element("script", { src, "ramjet-injected": "true" });
 		const injectScripts = context.interface.getInjectScripts(
 			meta,
 			handler,
 			htmlcontext,
-			script
+			script,
 		);
 
 		if (isQuirky) {
 			dbg.warn(
-				`detected quirky document structure parsing @ ${meta.origin.href}!`
+				`detected quirky document structure parsing @ ${meta.origin.href}!`,
 			);
-			// there's weird stuff going on with the document that could result in page scripts being loaded before our inject scripts
-			// so inject them at position 0
+
 			handler.root.children.unshift(...injectScripts);
 		} else {
 			if (!headElement) {
@@ -272,7 +267,7 @@ function rewriteHtmlInner(
 			htmlcontext,
 			origHtml: html,
 		},
-		props
+		props,
 	);
 
 	if (props.setRawHtml !== undefined) {
@@ -284,9 +279,9 @@ function rewriteHtmlInner(
 
 export function rewriteHtml(
 	html: string,
-	context: ScramjetContext,
+	context: RamjetContext,
 	meta: URLMeta,
-	htmlcontext: HtmlContext
+	htmlcontext: HtmlContext,
 ) {
 	const before = Performance_now();
 	const ret = rewriteHtmlInner(html, context, meta, htmlcontext);
@@ -296,11 +291,6 @@ export function rewriteHtml(
 
 	return ret;
 }
-
-// type ParseState = {
-// 	base: string;
-// 	origin?: URL;
-// };
 
 export function unrewriteHtml(html: string, foreignContext?: ForeignContext) {
 	const handler = new DomHandler((err, dom) => dom);
@@ -314,14 +304,14 @@ export function unrewriteHtml(html: string, foreignContext?: ForeignContext) {
 	function traverse(node: ChildNode) {
 		if ("attribs" in node) {
 			for (const key in node.attribs) {
-				if (key == "scramjet-attr-script-source-src") {
+				if (key == "ramjet-attr-script-source-src") {
 					if (node.children[0] && "data" in node.children[0])
 						node.children[0].data = atob(node.attribs[key]);
 					continue;
 				}
 
-				if (key.startsWith("scramjet-attr-")) {
-					node.attribs[key.slice("scramjet-attr-".length)] = node.attribs[key];
+				if (key.startsWith("ramjet-attr-")) {
+					node.attribs[key.slice("ramjet-attr-".length)] = node.attribs[key];
 					delete node.attribs[key];
 				}
 			}
@@ -341,13 +331,11 @@ export function unrewriteHtml(html: string, foreignContext?: ForeignContext) {
 	});
 }
 
-// i need to add the attributes in during rewriting
-
-function traverseParsedHtml(
-	node: any,
-	context: ScramjetContext,
-	meta: URLMeta
-) {
+export function rewriteElementAttributes(
+	node: { name: string; attribs: Record<string, string> },
+	context: RamjetContext,
+	meta: URLMeta,
+): void {
 	if (node.name === "base" && node.attribs.href !== undefined) {
 		meta.base = new _URL(node.attribs.href, meta.origin);
 	}
@@ -366,25 +354,36 @@ function traverseParsedHtml(
 						if (v === null) delete node.attribs[attr];
 						else {
 							node.attribs[attr] = v;
+							noteHtmlResource(node.name, attr, v, node.attribs);
 						}
-						node.attribs[`scramjet-attr-${attr}`] = value;
+						node.attribs[`ramjet-attr-${attr}`] = value;
 					}
 				}
 			}
 		}
 		for (const [attr, value] of Object_entries(node.attribs)) {
 			if (eventAttributes.includes(attr)) {
-				node.attribs[`scramjet-attr-${attr}`] = value;
+				node.attribs[`ramjet-attr-${attr}`] = value;
 				node.attribs[attr] = rewriteJs(
 					value as string,
 					`(inline ${attr} on element)`,
 					context,
-					meta
-				);
+					meta,
+				) as string;
 			}
 		}
 	}
+}
 
+export function rewriteElementContent(
+	node: {
+		name: string;
+		attribs: Record<string, string>;
+		children: { data: string }[];
+	},
+	context: RamjetContext,
+	meta: URLMeta,
+): void {
 	if (node.name === "style" && node.children[0] !== undefined)
 		node.children[0].data = rewriteCss(node.children[0].data, context, meta);
 
@@ -420,13 +419,13 @@ function traverseParsedHtml(
 			"type" in node.attribs ? node.attribs.type : undefined,
 			"language" in node.attribs ? node.attribs.language : undefined,
 			"type" in node.attribs,
-			"language" in node.attribs
+			"language" in node.attribs,
 		);
 		if (isScriptType(scriptBlockType)) {
 			let js = node.children[0].data;
 			const module = isModuleScriptType(scriptBlockType);
-			node.attribs["scramjet-attr-script-source-src"] = bytesToBase64(
-				TextEncoder_encode(js)
+			node.attribs["ramjet-attr-script-source-src"] = bytesToBase64(
+				TextEncoder_encode(js),
 			);
 			const htmlcomment = /<!--[\s\S]*?-->/g;
 			js = js.replace(htmlcomment, "");
@@ -435,17 +434,23 @@ function traverseParsedHtml(
 				"(inline script element)",
 				context,
 				meta,
-				module
-			);
+				module,
+			) as string;
 		}
 	}
+}
 
+export function rewriteMetaElement(
+	node: { name: string; attribs: Record<string, string> },
+	context: RamjetContext,
+	meta: URLMeta,
+): Comment | null {
+	let replacement: Comment | null = null;
 	if (node.name === "meta" && node.attribs["http-equiv"] !== undefined) {
 		if (
 			node.attribs["http-equiv"].toLowerCase() === "content-security-policy"
 		) {
-			// just delete it. this needs to be emulated eventually but like
-			node = new Comment(node.attribs.content);
+			replacement = new Comment(node.attribs.content);
 		} else if (node.attribs["http-equiv"].toLowerCase() === "refresh") {
 			const refresh = parseDeclarativeRefresh(node.attribs.content || "");
 			if (refresh && refresh.url !== null && refresh.url.length > 0) {
@@ -457,13 +462,22 @@ function traverseParsedHtml(
 			}
 		}
 	}
+	return replacement;
+}
+
+function traverseParsedHtml(node: any, context: RamjetContext, meta: URLMeta) {
+	rewriteElementAttributes(node, context, meta);
+	rewriteElementContent(node, context, meta);
+	const replacement =
+		node.name === "meta" ? rewriteMetaElement(node, context, meta) : null;
+	if (replacement) node = replacement;
 
 	if (node.childNodes) {
 		for (const childNode in node.childNodes) {
 			node.childNodes[childNode] = traverseParsedHtml(
 				node.childNodes[childNode],
 				context,
-				meta
+				meta,
 			);
 		}
 	}
@@ -473,16 +487,13 @@ function traverseParsedHtml(
 
 export function rewriteSrcset(
 	srcset: string,
-	context: ScramjetContext,
-	meta: URLMeta
+	context: RamjetContext,
+	meta: URLMeta,
 ) {
 	const sources = srcset.split(/ .*,/).map((src) => src.trim());
 	const rewrittenSources = sources.map((source) => {
-		// Split into URLs and descriptors (if any)
-		// e.g. url0, url1 1.5x, url2 2x
 		const [url, ...descriptors] = source.split(/\s+/);
 
-		// Rewrite the URLs and keep the descriptors (if any)
 		const rewrittenUrl = rewriteUrl(url.trim(), context, meta);
 
 		return descriptors.length > 0
@@ -492,12 +503,6 @@ export function rewriteSrcset(
 
 	return rewrittenSources.join(", ");
 }
-
-// function base64ToBytes(base64) {
-// 	const binString = atob(base64);
-
-// 	return Uint8Array.from(binString, (m) => m.codePointAt(0));
-// }
 
 const eventAttributes = [
 	"onbeforexrselect",

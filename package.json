@@ -1,5 +1,5 @@
 {
-	"name": "scramjet-root",
+	"name": "ramjet-root",
 	"version": "1.0.0",
 	"description": "",
 	"type": "module",
@@ -11,7 +11,10 @@
 		"dev": "node --no-warnings=ExperimentalWarning devserver.ts",
 		"dev:debug": "DEBUG=1 node --no-warnings=ExperimentalWarning devserver.ts",
 		"test:package": "ava tests/ci/packageValidation.js",
-		"preinstall": "npx only-allow pnpm"
+		"preinstall": "npx only-allow pnpm",
+		"release:build": "node scripts/make-release.mjs",
+		"release:verify": "node scripts/verify-release.mjs",
+		"github:prepare": "node scripts/prepare-github.mjs"
 	},
 	"ava": {
 		"files": [
@@ -20,21 +23,30 @@
 		"verbose": true
 	},
 	"devDependencies": {
-		"@rspack/cli": "^1.5.8",
-		"@rspack/core": "^1.5.8",
-		"@fastify/deepmerge": "^3.2.1",
-		"@rsdoctor/rspack-plugin": "^1.4.0",
-		"ts-checker-rspack-plugin": "^1.1.6",
-		"tsc-alias": "^1.8.16",
+		"@fastify/deepmerge": "^3.2.2",
 		"@mercuryworkshop/wisp-js": "catalog:",
-		"chafa-wasm": "^0.3.1",
-		"chalk": "^5.6.2",
-		"eslint": "^10.2.0",
-		"vite": "^7.3.0",
+		"@rsdoctor/rspack-plugin": "^1.6.4",
+		"@rspack/cli": "^1.7.12",
+		"@rspack/core": "^1.7.12",
 		"ava": "^6.4.1",
-		"glob": "^13.0.6"
+		"chafa-wasm": "^0.3.3",
+		"chalk": "^5.6.2",
+		"eslint": "^10.12.0",
+		"glob": "^13.0.6",
+		"ts-checker-rspack-plugin": "^1.6.2",
+		"tsc-alias": "^1.9.7",
+		"vite": "^7.3.6",
+		"vitest": "^5.0.3"
 	},
 	"dependencies": {
-		"prettier": "^3.6.2"
+		"prettier": "^3.9.9"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/hackz00/ramjet.git"
+	},
+	"homepage": "https://github.com/hackz00/ramjet#readme",
+	"bugs": {
+		"url": "https://github.com/hackz00/ramjet/issues"
 	}
 }

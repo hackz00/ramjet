@@ -1,4 +1,4 @@
-declare const SCRAMJET_EXPECTED_VERSION: string;
+declare const RAMJET_EXPECTED_VERSION: string;
 declare const CONTROLLER_EXPECTED_VERSION: string;
 
 function assertVersionMatch(
@@ -14,27 +14,27 @@ function assertVersionMatch(
 }
 
 export function assertDependencyVersions() {
-	if (typeof $scramjet === "undefined") {
+	if (typeof $ramjet === "undefined") {
 		console.error(
-			"@mercuryworkshop/scramjet is not loaded. Load scramjet before scramjet-utils."
+			"@ramjet/core is not loaded. Load ramjet before ramjet-utils."
 		);
 	}
 
 	assertVersionMatch(
-		"@mercuryworkshop/scramjet",
-		SCRAMJET_EXPECTED_VERSION,
-		$scramjet.versionInfo.version
+		"@ramjet/core",
+		RAMJET_EXPECTED_VERSION,
+		$ramjet.versionInfo.version
 	);
 
-	if (typeof $scramjetController === "undefined") {
+	if (typeof $ramjetController === "undefined") {
 		console.error(
-			"@mercuryworkshop/scramjet-controller is not loaded. Load the controller before scramjet-utils."
+			"@ramjet/controller is not loaded. Load the controller before ramjet-utils."
 		);
 	}
 
 	assertVersionMatch(
-		"@mercuryworkshop/scramjet-controller",
+		"@ramjet/controller",
 		CONTROLLER_EXPECTED_VERSION,
-		$scramjetController.VERSION
+		$ramjetController.VERSION
 	);
 }

@@ -1,4 +1,4 @@
-import { flagEnabled, ScramjetContext } from "@/shared";
+import { flagEnabled, RamjetContext } from "@/shared";
 import { rewriteJs } from "@rewriters/js";
 import { URLMeta } from "@rewriters/url";
 import { TextDecoder_decode } from "@/shared/snapshot";
@@ -7,9 +7,9 @@ import { base64Encode } from "@/shared/util";
 export function rewriteWorkers(
 	js: string | Uint8Array,
 	url: string,
-	context: ScramjetContext,
+	context: RamjetContext,
 	meta: URLMeta,
-	isModule: boolean
+	isModule: boolean,
 ) {
 	const script = (script: string) => {
 		if (isModule) {
@@ -27,7 +27,6 @@ export function rewriteWorkers(
 	}
 
 	if (flagEnabled("encapsulateWorkers", context, meta.origin)) {
-		// TODO: check if there's already a sourceURL/sourcemap before appending another?
 		rewritten += `//# sourceURL=${url}`;
 		str += script(b64(rewritten as string));
 	} else {

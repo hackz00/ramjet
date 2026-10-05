@@ -1,10 +1,10 @@
-import { isHtmlMimeType, ScramjetHeaders } from "@/shared";
+import { isHtmlMimeType, RamjetHeaders } from "@/shared";
 import { BareResponse } from "@mercuryworkshop/proxy-transports";
-import { ScramjetFetchParsed } from ".";
+import { RamjetFetchParsed } from ".";
 
 export function normalizeContentType(
-	parsed: ScramjetFetchParsed,
-	headers: ScramjetHeaders
+	parsed: RamjetFetchParsed,
+	headers: RamjetHeaders,
 ) {
 	if (!isDocument(parsed)) return;
 
@@ -15,18 +15,20 @@ export function normalizeContentType(
 	headers.set("content-type", "text/html; charset=utf-8");
 }
 
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
 export function isRedirect(response: BareResponse) {
-	return response.status >= 300 && response.status < 400;
+	return REDIRECT_STATUSES.has(response.status);
 }
 
-export function isDocument(parsed: ScramjetFetchParsed) {
+export function isDocument(parsed: RamjetFetchParsed) {
 	return parsed.destination === "document" || parsed.destination === "iframe";
 }
 
 export function createReferrerString(
 	clientUrl: URL,
 	resource: URL,
-	policy: string | null
+	policy: string | null,
 ): string {
 	policy ||= "strict-origin-when-cross-origin";
 	const originIsHttps = clientUrl.protocol === "https:";

@@ -1,27 +1,7 @@
 import { serverTest } from "../../testcommon.ts";
 
-// Two different sites viewed through the same proxy share one *real* browser
-// origin, so the browser's own same-origin policy no longer separates them.
-// Keeping them apart becomes the proxy's job, and it is only partly done:
-// request-time cookie scoping is enforced, but a frame belonging to another
-// proxied site is fully readable from script - its DOM, its cookie jar and its
-// location all read out.
-//
-// That is architectural rather than a small bug: real separation needs a
-// distinct browser origin per proxied site. It is worth pinning down anyway,
-// because it is the difference between "a site renders wrong" and "one site can
-// read another site's session".
-//
-// This is a single test on purpose. It needs `hostname`, and consecutive
-// hostname-based tests interfere in the harness - the second one wedges until it
-// times out - so the working and broken halves are asserted on one page, working
-// half first, so that a regression in request scoping surfaces as a different
-// failure message rather than hiding behind the known one.
-
 export default [
 	serverTest({
-		// KNOWN FAILURE: the cross-site frame assertions below. Everything before
-		// them currently holds.
 		name: "originisolation-cross-site-frame-access",
 		hostname: "a.example",
 		cleartextHosts: ["b.example"],
@@ -69,7 +49,7 @@ export default [
 						"Set-Cookie": "bsecret=bvalue; Path=/",
 					});
 					res.end(
-						'<!DOCTYPE html><html><body><p id="secret">B-SIDE-SECRET</p></body></html>'
+						'<!DOCTYPE html><html><body><p id="secret">B-SIDE-SECRET</p></body></html>',
 					);
 					return;
 				}
@@ -82,7 +62,7 @@ export default [
 					JSON.stringify({
 						host: req.headers.host,
 						cookie: req.headers.cookie ?? null,
-					})
+					}),
 				);
 			});
 		},

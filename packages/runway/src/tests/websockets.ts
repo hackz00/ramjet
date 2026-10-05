@@ -193,7 +193,7 @@ export default [
 	serverTest({
 		name: "websocketstream-origin-header",
 		autoPass: false,
-		scramjetOnly: true,
+		ramjetOnly: true,
 		js: `
 			assert(typeof WebSocketStream === "function", "WebSocketStream should exist");
 

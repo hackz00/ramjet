@@ -1,10 +1,5 @@
 import { serverTest } from "../../testcommon.ts";
 
-// ES module loading: specifier resolution, import.meta.url, import maps, and
-// dynamic <script> injection. import.meta.url in particular is how modern code
-// finds its own sibling assets - `new URL("./worker.js", import.meta.url)` is
-// the pattern every bundler emits for workers, wasm binaries and locale files.
-
 const FILES: Record<string, string> = {
 	"/p.js": `window.__preloaded = true;`,
 	"/mod.js": `export const v = "modvalue"; export const metaUrl = import.meta.url;`,
@@ -46,7 +41,7 @@ export default [
 			assertEqual(m.v, "modvalue", "named export");
 			assertEqual(await import("/mod.js"), m, "module identity is cached across imports");
 			assertEqual(typeof m.metaUrl, "string", "import.meta.url is a string");
-		`
+		`,
 	),
 	modTest(
 		"modules-specifier-resolution",
@@ -55,7 +50,7 @@ export default [
 				"a module importing another module by absolute path");
 			assertEqual((await import("/modrel.js")).rel, "rel:modvalue",
 				"a relative specifier resolves against the importing module");
-		`
+		`,
 	),
 	modTest(
 		"modules-inline-module-script",
@@ -69,7 +64,7 @@ export default [
 				await new Promise((r) => setTimeout(r, 50));
 			}
 			assertEqual(window.__inlineResult, "modvalue", "an inline module script with a static import");
-		`
+		`,
 	),
 	modTest(
 		"modules-script-injection",
@@ -86,7 +81,7 @@ export default [
 				"document.currentScript.src inside it: " + window.__currentScriptSrc);
 			assertEqual(s.src, location.origin + "/classic.js", "script.src property");
 			assertEqual(s.getAttribute("src"), "/classic.js", "script src attribute");
-		`
+		`,
 	),
 	modTest(
 		"modules-script-order",
@@ -104,17 +99,10 @@ export default [
 			await new Promise((r) => setTimeout(r, 800));
 			assertDeepEqual(window.__order, ["a", "b"], "async=false injected scripts keep document order");
 			assertEqual(window.__classicRan, 2, "both ran");
-		`
+		`,
 	),
 
-	// ------------------------------------------------------------------
 	modTest(
-		// KNOWN FAILURE: inside a fetched module, import.meta.url is the whole
-		// proxy URL (including the $module and $io query parameters) rather than
-		// the module's own URL. Anything that resolves a sibling asset from it -
-		// workers, wasm, locale JSON - builds its URL from the proxy path, and any
-		// code that parses or logs it sees proxy internals. An *inline* module
-		// script gets this right; only fetched modules are affected.
 		"modules-import-meta-url",
 		`
 			const m = await import("/mod.js");
@@ -122,14 +110,11 @@ export default [
 			assertEqual(m.metaUrl, location.origin + "/mod.js", "import.meta.url");
 			const s = await import("/modsibling.js");
 			assertEqual(s.sibling, location.origin + "/mod.js", "a sibling URL built from import.meta.url");
-		`
+		`,
 	),
 	modTest(
-		// KNOWN FAILURE: <script type="importmap"> is not rewritten, so a bare
-		// specifier resolves against the proxy origin root
 		// (http://localhost:4500/mod.js) and the import fails outright. Import maps
-		// are how buildless setups and an increasing number of shipped apps
-		// resolve their dependencies.
+
 		"modules-importmap",
 		`
 			const im = document.createElement("script");
@@ -140,7 +125,7 @@ export default [
 			try { m = await import("bare-spec"); } catch (e) { err = e; }
 			assert(!err, "a bare specifier from an import map must resolve: " + (err && err.message));
 			assertEqual(m && m.v, "modvalue", "import map resolution");
-		`
+		`,
 	),
 	modTest(
 		"modules-preload-link",
@@ -162,7 +147,7 @@ export default [
 			s.src = "/p.js";
 			await new Promise((res, rej) => { s.onload = res; s.onerror = rej; document.head.appendChild(s); });
 			assertEqual(window.__preloaded, true, "the preloaded script then ran");
-		`
+		`,
 	),
 	modTest(
 		"modules-modulepreload-link",
@@ -178,6 +163,6 @@ export default [
 			});
 			assert(loaded !== false, "modulepreload did not error: " + loaded);
 			assertEqual(l.href, location.origin + "/p.js", "modulepreload href");
-		`
+		`,
 	),
 ];

@@ -1,35 +1,31 @@
-// NOTE: this is the entrypoint for scramjet.bundle.js
-// as such it exports everything in scramjet
-// the entry point for scramjet.all.js (what most sites wil use) is entry.ts
-
 import "./global.d";
 import { atob } from "@/shared/snapshot";
 import { setWasm } from "@rewriters/wasm";
-import { ScramjetVersionInfo, ScramjetConfig } from "./types";
+import { RamjetVersionInfo, RamjetConfig } from "./types";
 
 declare const VERSION: string;
 declare const COMMITHASH: string;
 declare const BUILDDATE: string;
-export const versionInfo: ScramjetVersionInfo = {
+export const versionInfo: RamjetVersionInfo = {
 	version: VERSION,
 	build: COMMITHASH,
 	date: BUILDDATE,
 };
 
-export const defaultConfig: ScramjetConfig = {
+export const defaultConfig: RamjetConfig = {
 	globals: {
-		wrapfn: "$scramjet$wrap",
-		wrappropertybase: "$scramjet__",
-		wrappropertyfn: "$scramjet$prop",
-		cleanrestfn: "$scramjet$clean",
-		importfn: "$scramjet$import",
-		rewritefn: "$scramjet$rewrite",
-		metafn: "$scramjet$meta",
-		wrappostmessagefn: "$scramjet$wrappostmessage",
-		pushsourcemapfn: "$scramjet$pushsourcemap",
-		trysetfn: "$scramjet$tryset",
-		templocid: "$scramjet$temploc",
-		tempunusedid: "$scramjet$tempunused",
+		wrapfn: "$ramjet$wrap",
+		wrappropertybase: "$ramjet__",
+		wrappropertyfn: "$ramjet$prop",
+		cleanrestfn: "$ramjet$clean",
+		importfn: "$ramjet$import",
+		rewritefn: "$ramjet$rewrite",
+		metafn: "$ramjet$meta",
+		wrappostmessagefn: "$ramjet$wrappostmessage",
+		pushsourcemapfn: "$ramjet$pushsourcemap",
+		trysetfn: "$ramjet$tryset",
+		templocid: "$ramjet$temploc",
+		tempunusedid: "$ramjet$tempunused",
 	},
 	flags: {
 		syncxhr: false,
@@ -50,7 +46,7 @@ export const defaultConfig: ScramjetConfig = {
 	maskedfiles: [],
 };
 
-export const defaultConfigDev: ScramjetConfig = {
+export const defaultConfigDev: RamjetConfig = {
 	...defaultConfig,
 	flags: {
 		...defaultConfig.flags,
@@ -64,7 +60,7 @@ export const defaultConfigDev: ScramjetConfig = {
 };
 
 declare const REWRITERWASM: string | undefined;
-// bundled build will have the wasm binary inlined as a base64 string
+
 if (REWRITERWASM) {
 	setWasm(Uint8Array.from(atob(REWRITERWASM), (c) => c.charCodeAt(0)));
 }

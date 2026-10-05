@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="456" viewBox="0 0 760 456" font-family="Segoe UI, Arial, sans-serif" font-size="13" role="img" aria-label="Page load, first visit, CPU 4x slower">
+<style>
+  .card{fill:#ffffff;stroke:#d5dbe3}
+  .t{fill:#14213d;font-size:17px;font-weight:600} .s{fill:#5b6675;font-size:12.5px}
+  .l{fill:#1f2933;font-size:13px} .v{fill:#1f2933;font-size:12px}
+  .base{fill:#a7b1bd} .cand{fill:#1f5fe0} .good{fill:#0e8a4f;font-size:12px;font-weight:600} .bad{fill:#c2410c;font-size:12px;font-weight:600}
+  .axis{stroke:#e3e8ee} .zero{stroke:#7b8794}
+  @media (prefers-color-scheme: dark){
+    .card{fill:#0f1720;stroke:#2b3745} .t{fill:#f1f5f9} .s{fill:#9fb0c3} .l,.v{fill:#e5ebf2}
+    .base{fill:#5c6b7c} .cand{fill:#5b9bff} .good{fill:#4ade80} .bad{fill:#fb923c} .axis{stroke:#243241} .zero{stroke:#9fb0c3}
+  }
+</style>
+<rect class="card" x="0.5" y="0.5" width="759" height="455" rx="6"/>
+<text class="t" x="24" y="42">Page load, first visit, CPU 4x slower</text>
+<text class="s" x="24" y="62">cold visit, median of 5 runs</text>
+<text class="l" x="24" y="96">article</text>
+<rect class="base" x="174" y="80" width="319.0" height="15" rx="3"/>
+<text class="v" x="499.0140161164314" y="92">1354 ms</text>
+<rect class="cand" x="174" y="98" width="190.7" height="15" rx="3"/>
+<text class="v" x="370.7012882964432" y="110">809 ms</text>
+<text class="good" x="736" y="104" text-anchor="end">-40%</text>
+<text class="l" x="24" y="142">spa</text>
+<rect class="base" x="174" y="126" width="346.0" height="15" rx="3"/>
+<text class="v" x="525.9775715578849" y="138">1468 ms</text>
+<rect class="cand" x="174" y="144" width="356.6" height="15" rx="3"/>
+<text class="v" x="536.6074668519843" y="156">1513 ms</text>
+<text class="bad" x="736" y="150" text-anchor="end">+3%</text>
+<text class="l" x="24" y="188">css-heavy</text>
+<rect class="base" x="174" y="172" width="412.0" height="15" rx="3"/>
+<text class="v" x="592.0431217452311" y="184">1748 ms</text>
+<rect class="cand" x="174" y="190" width="242.1" height="15" rx="3"/>
+<text class="v" x="422.1301177194431" y="202">1027 ms</text>
+<text class="good" x="736" y="196" text-anchor="end">-41%</text>
+<text class="l" x="24" y="234">grid</text>
+<rect class="base" x="174" y="218" width="308.8" height="15" rx="3"/>
+<text class="v" x="488.8083844395213" y="230">1310 ms</text>
+<rect class="cand" x="174" y="236" width="111.2" height="15" rx="3"/>
+<text class="v" x="291.1540754741201" y="248">472 ms</text>
+<text class="good" x="736" y="242" text-anchor="end">-64%</text>
+<text class="l" x="24" y="280">frames</text>
+<rect class="base" x="174" y="264" width="198.3" height="15" rx="3"/>
+<text class="v" x="378.3143257413625" y="276">841 ms</text>
+<rect class="cand" x="174" y="282" width="108.3" height="15" rx="3"/>
+<text class="v" x="288.3492631192222" y="294">460 ms</text>
+<text class="good" x="736" y="288" text-anchor="end">-45%</text>
+<text class="l" x="24" y="326">news</text>
+<rect class="base" x="174" y="310" width="442.0" height="15" rx="3"/>
+<text class="v" x="622" y="322">1875 ms</text>
+<rect class="cand" x="174" y="328" width="255.2" height="15" rx="3"/>
+<text class="v" x="435.2112244017201" y="340">1083 ms</text>
+<text class="good" x="736" y="334" text-anchor="end">-42%</text>
+<text class="l" x="24" y="372">interactive</text>
+<rect class="base" x="174" y="356" width="133.0" height="15" rx="3"/>
+<text class="v" x="312.95591994458175" y="368">564 ms</text>
+<rect class="cand" x="174" y="374" width="67.6" height="15" rx="3"/>
+<text class="v" x="247.5975141478011" y="386">287 ms</text>
+<text class="good" x="736" y="380" text-anchor="end">-49%</text>
+
+<rect class="base" x="24" y="402" width="12" height="12" rx="2"/><text class="s" x="42" y="412">Scramjet 2.0.67 (upstream)</text>
+<rect class="cand" x="254" y="402" width="12" height="12" rx="2"/><text class="s" x="272" y="412">Ramjet</text>
+<text class="s" x="736" y="412" text-anchor="end">lower is better</text>
+</svg>

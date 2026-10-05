@@ -1,0 +1,101 @@
+run 1/7 current+native article: cold fcp=316 load=757 | warm fcp=196 load=197
+run 1/7 current+native spa: cold fcp=112 load=777 | warm fcp=196 load=198
+run 1 current+native css-heavy: FAILED page check failed (css-heavy): font not loaded: error
+run 1/7 current+native grid: cold fcp=108 load=379 | warm fcp=108 load=396
+run 1/7 current+native frames: cold fcp=104 load=190 | warm fcp=96 load=187
+run 1/7 current+native news: cold fcp=328 load=741 | warm fcp=204 load=346
+run 1/7 current+native interactive: cold fcp=128 load=144 | warm fcp=116 load=125
+run 1/7 current+assisted article: cold fcp=356 load=475 | warm fcp=232 load=231
+run 1/7 current+assisted spa: cold fcp=156 load=901 | warm fcp=108 load=248
+run 1/7 current+assisted css-heavy: cold fcp=416 load=404 | warm fcp=216 load=207
+run 1/7 current+assisted grid: cold fcp=121 load=252 | warm fcp=124 load=226
+run 1/7 current+assisted frames: cold fcp=132 load=244 | warm fcp=112 load=217
+run 1/7 current+assisted news: cold fcp=344 load=474 | warm fcp=244 load=370
+run 1/7 current+assisted interactive: cold fcp=128 load=147 | warm fcp=136 load=144
+run 2/7 current+native article: cold fcp=308 load=753 | warm fcp=196 load=197
+run 2/7 current+native spa: cold fcp=100 load=782 | warm fcp=200 load=204
+run 2 current+native css-heavy: FAILED page check failed (css-heavy): font not loaded: error
+run 2/7 current+native grid: cold fcp=116 load=374 | warm fcp=100 load=368
+run 2/7 current+native frames: cold fcp=120 load=199 | warm fcp=100 load=185
+run 2/7 current+native news: cold fcp=332 load=752 | warm fcp=212 load=360
+run 2/7 current+native interactive: cold fcp=108 load=135 | warm fcp=124 load=143
+run 2/7 current+assisted article: cold fcp=357 load=496 | warm fcp=244 load=291
+run 2/7 current+assisted spa: cold fcp=124 load=902 | warm fcp=124 load=261
+run 2/7 current+assisted css-heavy: cold fcp=437 load=427 | warm fcp=200 load=193
+run 2/7 current+assisted grid: cold fcp=128 load=323 | warm fcp=128 load=268
+run 2/7 current+assisted frames: cold fcp=129 load=244 | warm fcp=116 load=228
+run 2/7 current+assisted news: cold fcp=348 load=526 | warm fcp=232 load=365
+run 2/7 current+assisted interactive: cold fcp=145 load=159 | warm fcp=152 load=176
+run 3/7 current+native article: cold fcp=316 load=794 | warm fcp=192 load=197
+run 3/7 current+native spa: cold fcp=108 load=789 | warm fcp=204 load=206
+run 3 current+native css-heavy: FAILED page check failed (css-heavy): font not loaded: error
+run 3/7 current+native grid: cold fcp=108 load=367 | warm fcp=100 load=381
+run 3/7 current+native frames: cold fcp=108 load=185 | warm fcp=104 load=184
+run 3/7 current+native news: cold fcp=304 load=723 | warm fcp=204 load=349
+run 3/7 current+native interactive: cold fcp=132 load=141 | warm fcp=124 load=132
+run 3/7 current+assisted article: cold fcp=364 load=507 | warm fcp=244 load=244
+run 3/7 current+assisted spa: cold fcp=133 load=901 | warm fcp=124 load=264
+run 3/7 current+assisted css-heavy: cold fcp=449 load=438 | warm fcp=200 load=193
+run 3/7 current+assisted grid: cold fcp=133 load=305 | warm fcp=120 load=309
+run 3/7 current+assisted frames: cold fcp=140 load=254 | warm fcp=120 load=234
+run 3/7 current+assisted news: cold fcp=360 load=496 | warm fcp=244 load=367
+run 3/7 current+assisted interactive: cold fcp=168 load=171 | warm fcp=217 load=211
+run 4/7 current+native article: cold fcp=328 load=767 | warm fcp=196 load=207
+run 4/7 current+native spa: cold fcp=96 load=781 | warm fcp=196 load=199
+run 4 current+native css-heavy: FAILED page check failed (css-heavy): font not loaded: error
+run 4/7 current+native grid: cold fcp=112 load=369 | warm fcp=100 load=365
+run 4/7 current+native frames: cold fcp=104 load=183 | warm fcp=96 load=186
+run 4/7 current+native news: cold fcp=324 load=739 | warm fcp=216 load=361
+run 4/7 current+native interactive: cold fcp=116 load=129 | warm fcp=116 load=126
+run 4/7 current+assisted article: cold fcp=340 load=460 | warm fcp=228 load=230
+run 4/7 current+assisted spa: cold fcp=136 load=900 | warm fcp=120 load=264
+run 4/7 current+assisted css-heavy: cold fcp=424 load=413 | warm fcp=200 load=192
+run 4/7 current+assisted grid: cold fcp=128 load=254 | warm fcp=108 load=215
+run 4/7 current+assisted frames: cold fcp=132 load=246 | warm fcp=124 load=231
+run 4/7 current+assisted news: cold fcp=344 load=472 | warm fcp=253 load=364
+run 4/7 current+assisted interactive: cold fcp=137 load=148 | warm fcp=136 load=144
+run 5/7 current+native article: cold fcp=312 load=755 | warm fcp=196 load=197
+run 5/7 current+native spa: cold fcp=112 load=785 | warm fcp=200 load=194
+run 5 current+native css-heavy: FAILED page check failed (css-heavy): font not loaded: error
+run 5/7 current+native grid: cold fcp=104 load=374 | warm fcp=104 load=370
+run 5/7 current+native frames: cold fcp=108 load=191 | warm fcp=96 load=183
+run 5/7 current+native news: cold fcp=324 load=745 | warm fcp=208 load=349
+run 5/7 current+native interactive: cold fcp=108 load=131 | warm fcp=112 load=130
+run 5/7 current+assisted article: cold fcp=316 load=430 | warm fcp=240 load=242
+run 5/7 current+assisted spa: cold fcp=140 load=893 | warm fcp=112 load=253
+run 5/7 current+assisted css-heavy: cold fcp=432 load=422 | warm fcp=200 load=193
+run 5/7 current+assisted grid: cold fcp=133 load=262 | warm fcp=108 load=216
+run 5/7 current+assisted frames: cold fcp=136 load=245 | warm fcp=112 load=221
+run 5/7 current+assisted news: cold fcp=360 load=481 | warm fcp=240 load=366
+run 5/7 current+assisted interactive: cold fcp=169 load=149 | warm fcp=132 load=139
+run 6/7 current+native article: cold fcp=312 load=755 | warm fcp=196 load=198
+run 6/7 current+native spa: cold fcp=108 load=789 | warm fcp=196 load=198
+run 6 current+native css-heavy: FAILED page check failed (css-heavy): font not loaded: error
+run 6/7 current+native grid: cold fcp=108 load=370 | warm fcp=108 load=368
+run 6/7 current+native frames: cold fcp=108 load=183 | warm fcp=104 load=186
+run 6/7 current+native news: cold fcp=324 load=739 | warm fcp=204 load=352
+run 6/7 current+native interactive: cold fcp=120 load=143 | warm fcp=104 load=132
+run 6/7 current+assisted article: cold fcp=348 load=472 | warm fcp=216 load=216
+run 6/7 current+assisted spa: cold fcp=137 load=898 | warm fcp=116 load=262
+run 6/7 current+assisted css-heavy: cold fcp=425 load=415 | warm fcp=216 load=208
+run 6/7 current+assisted grid: cold fcp=132 load=261 | warm fcp=108 load=211
+run 6/7 current+assisted frames: cold fcp=125 load=235 | warm fcp=124 load=231
+run 6/7 current+assisted news: cold fcp=337 load=458 | warm fcp=240 load=364
+run 6/7 current+assisted interactive: cold fcp=137 load=147 | warm fcp=136 load=149
+run 7/7 current+native article: cold fcp=312 load=752 | warm fcp=200 load=199
+run 7/7 current+native spa: cold fcp=104 load=788 | warm fcp=196 load=198
+run 7 current+native css-heavy: FAILED page check failed (css-heavy): font not loaded: error
+run 7/7 current+native grid: cold fcp=116 load=375 | warm fcp=96 load=369
+run 7/7 current+native frames: cold fcp=104 load=190 | warm fcp=108 load=187
+run 7/7 current+native news: cold fcp=324 load=739 | warm fcp=200 load=349
+run 7/7 current+native interactive: cold fcp=124 load=138 | warm fcp=108 load=125
+run 7/7 current+assisted article: cold fcp=336 load=452 | warm fcp=228 load=230
+run 7/7 current+assisted spa: cold fcp=137 load=917 | warm fcp=108 load=252
+run 7/7 current+assisted css-heavy: cold fcp=412 load=400 | warm fcp=212 load=204
+run 7/7 current+assisted grid: cold fcp=120 load=250 | warm fcp=108 load=216
+run 7/7 current+assisted frames: cold fcp=133 load=244 | warm fcp=124 load=245
+run 7/7 current+assisted news: cold fcp=340 load=465 | warm fcp=240 load=369
+run 7/7 current+assisted interactive: cold fcp=137 load=156 | warm fcp=140 load=151
+wrote <repo>\packages\bench\results\current+native-typical-cpu1.json
+wrote <repo>\packages\bench\results\current+assisted-typical-cpu1.json
+7 measurement(s) failed

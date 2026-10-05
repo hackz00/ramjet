@@ -1,17 +1,5 @@
 import { basicTest } from "../../testcommon.ts";
 
-// The rewriter rewrites *every* `.postMessage` member expression to
-// `$scramjet$wrappostmessage(obj).postMessage`, and that helper returns a
-// throwaway object:
-//
-//   if (!obj || typeof obj.postMessage !== "function") return obj;
-//   return { postMessage: obj.postMessage.bind(obj) };
-//
-// So the property no longer belongs to the original object. Everything a page
-// can do with `.postMessage` other than calling it straight away is affected -
-// and Worker/MessagePort/BroadcastChannel plumbing is load-bearing on real
-// sites.
-
 export default [
 	basicTest({
 		name: "pmwrap-call-plain-object",
@@ -63,12 +51,7 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
-	// where the wrapper becomes observable
-	// ------------------------------------------------------------------
 	basicTest({
-		// KNOWN FAILURE: a fresh wrapper object with a fresh bound function is
-		// built on every property read.
 		name: "pmwrap-identity",
 		js: `
 			const o = { postMessage() {} };
@@ -78,8 +61,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: the wrapper hands back a bound function, so name and
-		// length are the bound function's.
 		name: "pmwrap-function-shape",
 		js: `
 			const o = { postMessage(a, b) {} };
@@ -88,9 +69,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: wrappostmessage reads obj.postMessage twice - once for
-		// the typeof guard and once for the bind - so a page-level accessor or a
-		// Proxy get trap fires twice.
 		name: "pmwrap-getter-invocation-count",
 		js: `
 			let gets = 0;
@@ -100,8 +78,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: the assignment target is the throwaway wrapper, so
-		// monkeypatching postMessage silently does nothing.
 		name: "pmwrap-assignment",
 		js: `
 			const o = { postMessage() { return "orig"; } };
@@ -114,7 +90,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: deletes a property of the throwaway wrapper.
 		name: "pmwrap-delete",
 		js: `
 			const o = { postMessage() {} };
@@ -123,10 +98,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: the wrapper binds to whatever the member expression's
-		// object was - here the prototype - so the later .call receiver is
-		// ignored and the call fails with an illegal invocation. Libraries reach
-		// for prototype methods precisely to avoid monkeypatched instances.
 		name: "pmwrap-prototype-method",
 		js: `
 			const mc = new MessageChannel();
@@ -137,10 +108,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: detaching a method loses its receiver in real JS. The
-		// wrapper pre-binds it, so scramjet keeps working where the web throws -
-		// code that relies on the TypeError (feature detection, `this` guards)
-		// takes a different branch.
 		name: "pmwrap-detached-loses-receiver",
 		js: `
 			const o = { tag: "T", postMessage(x) { return this.tag + x; } };

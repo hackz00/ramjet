@@ -1,12 +1,11 @@
 export const REGISTRY_URL = "https://registry.npmjs.org/";
-export const SCRAMJET_PACKAGE_NAME = "@mercuryworkshop/scramjet";
+export const RAMJET_PACKAGE_NAME = "@ramjet/core";
 
-export const SCRAMJET_CONTROLLER_PACKAGE_NAME =
-	"@mercuryworkshop/scramjet-controller";
-export const SCRAMJET_CONTROLLER_PINNED_MAJOR_VERSION = "0";
+export const RAMJET_CONTROLLER_PACKAGE_NAME = "@ramjet/controller";
+export const RAMJET_CONTROLLER_PINNED_MAJOR_VERSION = "0";
 
-export const SCRAMJET_UTILS_PACKAGE_NAME = "@mercuryworkshop/scramjet-utils";
-export const SCRAMJET_UTILS_PINNED_MAJOR_VERSION = "0";
+export const RAMJET_UTILS_PACKAGE_NAME = "@ramjet/utils";
+export const RAMJET_UTILS_PINNED_MAJOR_VERSION = "0";
 
 export const EPOXY_TRANSPORT_PACKAGE_NAME = "@mercuryworkshop/epoxy-transport";
 export const EPOXY_TRANSPORT_PINNED_MAJOR_VERSION = "3";
@@ -17,29 +16,35 @@ export const LIBCURL_TRANSPORT_PINNED_MAJOR_VERSION = "2";
 
 export type TransportOptions = "epoxy" | "libcurl" | "bare";
 
+export type PackageSource = "auto" | "local" | "registry";
+
 export type BootstrapOptions = {
 	transport: TransportOptions;
 	swPath: string;
 
 	wispPath: string;
 
-	scramjetBundlePath: string;
-	scramjetWasmPath: string;
-	scramjetUtilsBundlePath: string;
+	ramjetBundlePath: string;
+	ramjetWasmPath: string;
+	ramjetUtilsBundlePath: string;
 
 	epoxyClientPath: string;
 	libcurlClientPath: string;
 	bareClientPath: string;
-	scramjetControllerApiPath: string;
-	scramjetControllerInjectPath: string;
-	scramjetControllerSwPath: string;
+	ramjetControllerApiPath: string;
+	ramjetControllerInjectPath: string;
+	ramjetControllerSwPath: string;
 
 	bootstrapApiPath: string;
 	bootstrapInitPath: string;
 
-	scramjetVersionPin?: string;
-	scramjetControllerVersionPin?: string;
-	scramjetUtilsVersionPin?: string;
+	source?: PackageSource;
+
+	localBaseUrl?: string;
+
+	ramjetVersionPin?: string;
+	ramjetControllerVersionPin?: string;
+	ramjetUtilsVersionPin?: string;
 	epoxyTransportVersionPin?: string;
 	libcurlTransportVersionPin?: string;
 	bareTransportVersionPin?: string;
@@ -55,10 +60,10 @@ export const defaultConfig: Partial<BootstrapOptions> = {
 	bareClientPath: "/clients/bare-client.js",
 	bootstrapInitPath: "/bootstrap-init.js",
 
-	scramjetControllerApiPath: "/controller/controller.api.js",
-	scramjetControllerInjectPath: "/controller/controller.inject.js",
-	scramjetControllerSwPath: "/controller/controller.sw.js",
-	scramjetBundlePath: "/scram/scramjet.js",
-	scramjetWasmPath: "/scram/scramjet.wasm",
-	scramjetUtilsBundlePath: "/scram/scramjet-utils.js",
+	ramjetControllerApiPath: "/controller/controller.api.js",
+	ramjetControllerInjectPath: "/controller/controller.inject.js",
+	ramjetControllerSwPath: "/controller/controller.sw.js",
+	ramjetBundlePath: "/scram/ramjet.js",
+	ramjetWasmPath: "/scram/ramjet.wasm",
+	ramjetUtilsBundlePath: "/scram/ramjet-utils.js",
 };

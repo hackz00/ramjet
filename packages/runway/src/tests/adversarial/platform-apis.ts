@@ -1,10 +1,5 @@
 import { basicTest, htmlTest } from "../../testcommon.ts";
 
-// Assorted platform APIs that pages lean on constantly: blobs and object URLs,
-// resource timing, error stacks, storage-adjacent APIs, timers and the
-// navigator surface. Anywhere the proxy's own plumbing becomes visible here it
-// ends up in analytics payloads and error reports.
-
 export default [
 	basicTest({
 		name: "platform-blob-basics",
@@ -271,11 +266,7 @@ export default [
 		</script></body></html>`,
 	}),
 
-	// ------------------------------------------------------------------
 	basicTest({
-		// KNOWN FAILURE: the proxy's own scripts show up in the page's resource
-		// timeline under the harness origin, so RUM and performance-analytics
-		// libraries report requests the site never made.
 		name: "platform-resource-timing-no-proxy-internals",
 		js: `
 			const names = performance.getEntriesByType("resource").map((e) => e.name);
@@ -284,10 +275,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: stack frames carry the whole proxy URL, with the site's
-		// real URL percent-encoded inside it. Every error-reporting SDK (Sentry,
-		// Bugsnag, Rollbar) ships this verbatim, and stack-parsing code that
-		// expects the site's own origin misreads the frame.
 		name: "platform-error-stack-urls",
 		js: `
 			let e;
@@ -297,8 +284,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: revoking an object URL does not invalidate it, so the
-		// blob stays fetchable and its memory stays pinned.
 		name: "platform-objecturl-revoke",
 		js: `
 			const u = URL.createObjectURL(new Blob(["x"]));
@@ -310,8 +295,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: databases() reports the namespaced name plus the proxy's
-		// own control database.
 		name: "platform-indexeddb-databases",
 		js: `
 			if (!indexedDB.databases) { pass(); return; }
@@ -325,14 +308,11 @@ export default [
 			const names = (await indexedDB.databases()).map((d) => d.name);
 			assert(names.includes("adversarial-db2"),
 				"databases() must report the page's own name, got " + JSON.stringify(names));
-			assert(!names.some((n) => n.includes("scramjet")),
+			assert(!names.some((n) => n.includes("ramjet")),
 				"and must not expose proxy-internal databases: " + JSON.stringify(names));
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: navigator.serviceWorker is absent - most likely
-		// deliberate, since the proxy owns the registration, but it is observable:
-		// PWAs feature-detect on it and take a different path when it is missing.
 		name: "platform-navigator-serviceworker",
 		js: `
 			assert("serviceWorker" in navigator, "navigator.serviceWorker must exist");

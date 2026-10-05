@@ -1,4 +1,4 @@
-import { ScramjetContext } from "@/shared";
+import { RamjetContext } from "@/shared";
 import { rewriteJs } from "@rewriters/js";
 import { QP } from "@/fetch/parse";
 
@@ -11,10 +11,11 @@ import {
 	String_startsWith,
 	URL_createObjectURL,
 } from "../snapshot";
+import { BoundedLru } from "../memo";
 
-// user: manually triggered navigation
-// link: link clicked by the user. still user initiated, but doesn't wipe
-// location: location = ...
+const URL_MEMO_MAX = 1024;
+const urlMemo = new BoundedLru<string, string>(URL_MEMO_MAX);
+
 export type NavigationType = "user" | "link" | "location";
 
 export type RewriteUrlOptions = {
@@ -47,8 +48,8 @@ function tryCanParseURL(url: string, origin?: string | URL): _URL | null {
 
 export function rewriteBlob(
 	url: string,
-	context: ScramjetContext,
-	meta: URLMeta
+	context: RamjetContext,
+	meta: URLMeta,
 ) {
 	const blob = new _URL(url.substring("blob:".length));
 
@@ -57,8 +58,8 @@ export function rewriteBlob(
 
 export function unrewriteBlob(
 	url: string,
-	context: ScramjetContext,
-	_meta: URLMeta
+	context: RamjetContext,
+	_meta: URLMeta,
 ) {
 	const blob = new _URL(url.substring("blob:".length));
 
@@ -76,13 +77,13 @@ function dataToBlob(url: string) {
 	const mediaType = metaParts.shift() || "";
 	const isBase64 = metaParts.some((part) => part.toLowerCase() === "base64");
 	const params = metaParts.filter(
-		(part) => part && part.toLowerCase() !== "base64"
+		(part) => part && part.toLowerCase() !== "base64",
 	);
 
 	let type = mediaType || "text/plain";
 	if (!mediaType) {
 		const hasCharset = params.some((part) =>
-			String_startsWith(part.toLowerCase(), "charset=")
+			String_startsWith(part.toLowerCase(), "charset="),
 		);
 		if (!hasCharset) {
 			params.push("charset=US-ASCII");
@@ -103,22 +104,20 @@ function dataToBlob(url: string) {
 		let decoded = data;
 		try {
 			decoded = decodeURIComponent(data);
-		} catch {
-			// If decode fails, fall back to raw data.
-		}
+		} catch {}
 		bytes = TextEncoder_encode(decoded);
 	}
 
-	const blob = new Blob([bytes], { type });
+	const blob = new Blob([bytes as Uint8Array<ArrayBuffer>], { type });
 	const objectUrl = URL_createObjectURL(blob);
 	return { blob, objectUrl };
 }
 
 export function rewriteUrl(
 	url: string | URL,
-	context: ScramjetContext,
+	context: RamjetContext,
 	meta: URLMeta,
-	options?: RewriteUrlOptions
+	options?: RewriteUrlOptions,
 ) {
 	url = String(url);
 
@@ -129,7 +128,7 @@ export function rewriteUrl(
 				url.slice("javascript:".length),
 				"(javascript: url)",
 				context,
-				meta
+				meta,
 			)
 		);
 	} else if (String_startsWith(url, "blob:")) {
@@ -137,8 +136,7 @@ export function rewriteUrl(
 	} else if (String_startsWith(url, "data:")) {
 		const URL_MAX_LENGTH = 1024 * 1024 * 2;
 		const BUFFER = 1024;
-		// chrome will explode if you make a request to a service worker with a 2MB+ URL
-		// there's an okayish workaround which is just Pretending It's a Blob
+
 		if (url.length + context.prefix.href.length + BUFFER > URL_MAX_LENGTH) {
 			const { objectUrl } = dataToBlob(url);
 			return (
@@ -159,62 +157,78 @@ export function rewriteUrl(
 	} else {
 		let base = meta.base.href;
 
-		if (String_startsWith(base, "about:"))
-			base = unrewriteUrl(self.location.href, context); // jank!!!!! weird jank!!!
-		const realUrl = tryCanParseURL(url, base);
-		if (!realUrl) return url;
-
-		if (realUrl.protocol != "http:" && realUrl.protocol != "https:") {
-			// custom protocol. best thing to do is pass it through so it can open an app etc
-			// there's also extension:// pages we might need to worry about later
-			return url;
+		let memoKey: string | undefined;
+		if (!options && !String_startsWith(base, "about:")) {
+			memoKey = [
+				context.prefix.href,
+				base,
+				meta.origin.origin,
+				meta.referrerPolicy ?? "",
+				url,
+			].join("\n");
+			const hit = urlMemo.get(memoKey);
+			if (hit !== undefined) return hit;
 		}
 
-		const encodedHash = context.interface.codecEncode(realUrl.hash.slice(1));
-		const realHash = encodedHash ? "#" + encodedHash : "";
-		realUrl.hash = "";
-
-		const paramsInit = new _URLSearchParams();
-
-		const referrerPolicy =
-			!options?.isModule && (options?.referrerPolicy ?? meta.referrerPolicy);
-		if (referrerPolicy) paramsInit.set(QP.referrerPolicy, referrerPolicy);
-		if (options?.isModule) paramsInit.set(QP.isModule, "module");
-		if (options?.topFrame) paramsInit.set(QP.topFrame, options.topFrame);
-		if (options?.parentFrame)
-			paramsInit.set(QP.parentFrame, options.parentFrame);
-		if (options?.isIframe) paramsInit.set(QP.isIframe, options.isIframe);
-		if (options?.mode) paramsInit.set(QP.mode, options.mode);
-		if (options?.credentials)
-			paramsInit.set(QP.credentials, options.credentials);
-		if (options?.destination)
-			paramsInit.set(QP.destination, options.destination);
-
-		// specific tracking for sec-fetch-site
-		// don't send for the top level controller calling it in go()
-		if (meta.origin.origin !== context.prefix.origin) {
-			paramsInit.set(QP.initiatorOrigin, meta.origin.origin);
-		}
-
-		let paramstring = "";
-		if (paramsInit.toString()) paramstring = "?" + paramsInit.toString();
-
-		return (
-			context.prefix.href +
-			context.interface.codecEncode(realUrl.href) +
-			paramstring +
-			realHash
-		);
+		const result = rewriteHttpUrl(url, base, context, meta, options);
+		if (memoKey !== undefined) urlMemo.set(memoKey, result);
+		return result;
 	}
 }
 
-export function unrewriteUrl(url: string | URL, context: ScramjetContext) {
+function rewriteHttpUrl(
+	url: string,
+	base: string,
+	context: RamjetContext,
+	meta: URLMeta,
+	options?: RewriteUrlOptions,
+): string {
+	if (String_startsWith(base, "about:"))
+		base = unrewriteUrl(self.location.href, context);
+	const realUrl = tryCanParseURL(url, base);
+	if (!realUrl) return url;
+
+	if (realUrl.protocol != "http:" && realUrl.protocol != "https:") {
+		return url;
+	}
+
+	const encodedHash = context.interface.codecEncode(realUrl.hash.slice(1));
+	const realHash = encodedHash ? "#" + encodedHash : "";
+	realUrl.hash = "";
+
+	const paramsInit = new _URLSearchParams();
+
+	const referrerPolicy =
+		!options?.isModule && (options?.referrerPolicy ?? meta.referrerPolicy);
+	if (referrerPolicy) paramsInit.set(QP.referrerPolicy, referrerPolicy);
+	if (options?.isModule) paramsInit.set(QP.isModule, "module");
+	if (options?.topFrame) paramsInit.set(QP.topFrame, options.topFrame);
+	if (options?.parentFrame) paramsInit.set(QP.parentFrame, options.parentFrame);
+	if (options?.isIframe) paramsInit.set(QP.isIframe, options.isIframe);
+	if (options?.mode) paramsInit.set(QP.mode, options.mode);
+	if (options?.credentials) paramsInit.set(QP.credentials, options.credentials);
+	if (options?.destination) paramsInit.set(QP.destination, options.destination);
+
+	if (meta.origin.origin !== context.prefix.origin) {
+		paramsInit.set(QP.initiatorOrigin, meta.origin.origin);
+	}
+
+	let paramstring = "";
+	if (paramsInit.toString()) paramstring = "?" + paramsInit.toString();
+
+	return (
+		context.prefix.href +
+		context.interface.codecEncode(realUrl.href) +
+		paramstring +
+		realHash
+	);
+}
+
+export function unrewriteUrl(url: string | URL, context: RamjetContext) {
 	url = String(url);
 	if (String_startsWith(url, "javascript:")) {
-		//TODO
 		return url;
 	} else if (String_startsWith(url, "blob:")) {
-		// realistically this shouldn't happen
 		return url;
 	} else if (String_startsWith(url, context.prefix.href + "blob:")) {
 		return url.substring(context.prefix.href.length);
@@ -232,7 +246,6 @@ export function unrewriteUrl(url: string | URL, context: ScramjetContext) {
 		const realUrl = tryCanParseURL(url);
 		if (!realUrl) return url;
 		if (realUrl.protocol != "http:" && realUrl.protocol != "https:") {
-			// custom protocol
 			return url;
 		}
 		if (!String_startsWith(realUrl.href, context.prefix.href)) {
@@ -246,7 +259,7 @@ export function unrewriteUrl(url: string | URL, context: ScramjetContext) {
 
 		return (
 			context.interface.codecDecode(
-				realUrl.href.slice(context.prefix.href.length)
+				realUrl.href.slice(context.prefix.href.length),
 			) + realHash
 		);
 	} else if (url == "") {

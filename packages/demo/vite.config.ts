@@ -6,11 +6,11 @@ export default {
 			structured: false,
 			targets: [
 				{
-					src: "node_modules/@mercuryworkshop/scramjet/dist/*",
-					dest: "scramjet",
+					src: "node_modules/@ramjet/core/dist/*",
+					dest: "ramjet",
 				},
 				{
-					src: "node_modules/@mercuryworkshop/scramjet-controller/dist/*",
+					src: "node_modules/@ramjet/controller/dist/*",
 					dest: "controller",
 				},
 			],

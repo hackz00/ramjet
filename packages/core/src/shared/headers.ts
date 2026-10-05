@@ -1,6 +1,6 @@
 import { RawHeaders } from "@mercuryworkshop/proxy-transports";
 
-export class ScramjetHeaders {
+export class RamjetHeaders {
 	headers = {};
 
 	set(key: string, v: string) {
@@ -42,13 +42,10 @@ export class ScramjetHeaders {
 		return native;
 	}
 
-	static fromRawHeaders(raw: RawHeaders): ScramjetHeaders {
-		const h = new ScramjetHeaders();
+	static fromRawHeaders(raw: RawHeaders): RamjetHeaders {
+		const h = new RamjetHeaders();
 		for (const [k, v] of raw) {
 			if (h.has(k)) {
-				// console.debug(
-				// 	`Duplicate header "${k}" found in raw headers, overwriting previous value.`
-				// );
 			}
 			h.set(k, v);
 		}
@@ -56,8 +53,8 @@ export class ScramjetHeaders {
 		return h;
 	}
 
-	static fromNativeHeaders(native: Headers): ScramjetHeaders {
-		const h = new ScramjetHeaders();
+	static fromNativeHeaders(native: Headers): RamjetHeaders {
+		const h = new RamjetHeaders();
 		for (const [k, v] of native.entries()) {
 			h.set(k, v);
 		}
@@ -65,8 +62,8 @@ export class ScramjetHeaders {
 		return h;
 	}
 
-	clone(): ScramjetHeaders {
-		const newh = new ScramjetHeaders();
+	clone(): RamjetHeaders {
+		const newh = new RamjetHeaders();
 		for (const k in this.headers) {
 			newh.set(k, this.headers[k]);
 		}

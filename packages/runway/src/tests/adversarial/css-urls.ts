@@ -1,11 +1,5 @@
 import { basicTest } from "../../testcommon.ts";
 
-// url() references have to be rewritten on the way in and un-rewritten on the
-// way out, through the CSSOM as well as through markup. Setting a background
-// image from script and then serializing the element is an everyday thing:
-// carousels, lazy-loaders, theme switchers, and any framework that diffs the
-// style attribute.
-
 export default [
 	basicTest({
 		name: "cssurls-setattribute-roundtrip",
@@ -57,13 +51,7 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
 	basicTest({
-		// KNOWN FAILURE: a CSSOM write stores the fully-rewritten proxy URL in the
-		// style attribute, so serializing the element exposes it. Anything that
-		// reads outerHTML/innerHTML after setting a background image from script
-		// - templating, snapshot diffing, "copy element" tooling - carries the
-		// proxy URL with it.
 		name: "cssurls-cssom-write-serialization",
 		js: `
 			const d = document.createElement("div");
@@ -76,9 +64,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: getComputedStyle hands back the proxy URL. Lazy-loaders
-		// and image-preloaders read the computed background to decide what to
-		// fetch, and anything comparing it against a known URL fails.
 		name: "cssurls-computed-style",
 		js: `
 			const d = document.createElement("div");
@@ -90,8 +75,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: cssText on a rule is un-rewritten but reading the same
-		// value through the rule's style declaration is not.
 		name: "cssurls-cssrule-style-property",
 		js: `
 			const st = document.createElement("style");
@@ -103,11 +86,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: reading a url() back returns an absolutized URL rather
-		// than the author's string, whichever way it was written - including a
-		// <style> element's own textContent, which CSS-in-JS libraries read back
-		// to dedupe and patch rules. Mildest of the group in that it stays on the
-		// site's own origin.
 		name: "cssurls-author-string-preserved",
 		js: `
 			const a = document.createElement("div");

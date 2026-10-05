@@ -12,12 +12,21 @@
 	"author": "",
 	"license": "AGPL-3.0-only",
 	"dependencies": {
-		"@mercuryworkshop/proxy-bootstrap": "*",
+		"@ramjet/bootstrap": "*",
 		"express": "^4.21.2"
 	},
 	"devDependencies": {
-		"@mercuryworkshop/scramjet-utils": "*",
-		"@mercuryworkshop/scramjet-controller": "*",
-		"@mercuryworkshop/scramjet": "*"
+		"@ramjet/utils": "*",
+		"@ramjet/controller": "*",
+		"@ramjet/core": "*"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/hackz00/ramjet.git",
+		"directory": "packages/create-proxy-app/templates/default"
+	},
+	"homepage": "https://github.com/hackz00/ramjet#readme",
+	"bugs": {
+		"url": "https://github.com/hackz00/ramjet/issues"
 	}
 }

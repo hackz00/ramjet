@@ -1,9 +1,6 @@
-import { ScramjetClient } from "@client/index";
+import { RamjetClient } from "@client/index";
 
-export default function (client: ScramjetClient) {
-	// protocol handlers will not work out of the box since there's no guarantee the service worker will be set up
-	// or any other expectations that the user agent might need
-	// sites can set this up themselves if they want to
+export default function (client: RamjetClient) {
 	client.Proxy("Navigator.prototype.registerProtocolHandler", {
 		apply(ctx) {
 			ctx.return();

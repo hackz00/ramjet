@@ -1,8 +1,8 @@
 import { rewriteCss, unrewriteCss } from "@rewriters/css";
-import { ScramjetClient } from "@client/index";
+import { RamjetClient } from "@client/index";
 import { Reflect_apply, Reflect_get, Reflect_set } from "@/shared/snapshot";
 
-export default function (client: ScramjetClient) {
+export default function (client: RamjetClient) {
 	client.Proxy("CSSStyleDeclaration.prototype.setProperty", {
 		apply(ctx) {
 			if (!ctx.args[1]) return;
@@ -63,9 +63,6 @@ export default function (client: ScramjetClient) {
 
 	client.Trap("HTMLElement.prototype.style", {
 		get(ctx) {
-			// unfortunate and dumb hack. we have to trap every property of this
-			// since the prototype chain is fucked
-
 			const style = ctx.get() as CSSStyleDeclaration;
 
 			return new Proxy(style, {
@@ -93,13 +90,12 @@ export default function (client: ScramjetClient) {
 					return Reflect_set(
 						target,
 						prop,
-						rewriteCss(value, client.context, client.meta)
+						rewriteCss(value, client.context, client.meta),
 					);
 				},
 			});
 		},
 		set(ctx, value: string) {
-			// this will actually run the trap for cssText. don't rewrite it here
 			ctx.set(value);
 		},
 	});

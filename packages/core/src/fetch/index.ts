@@ -6,17 +6,20 @@ import {
 } from "@mercuryworkshop/proxy-transports";
 
 import { type URLMeta } from "@rewriters/url";
-import { type ScramjetRequestMode } from "./parse";
-import { ScramjetHeaders } from "@/shared/headers";
-import { HtmlRewriterHooks, ScramjetContext } from "@/shared";
+import { type RamjetRequestMode } from "./parse";
+import { RamjetHeaders } from "@/shared/headers";
+import { HtmlRewriterHooks, RamjetContext } from "@/shared";
 import { Tap, TapInstance } from "@/Tap";
 import { doHandleFetch } from "./fetch";
 import { _URL, _Map } from "@/shared/snapshot";
+import { Prefetcher, type PrefetchOptions } from "./prefetch";
+import { Preconnector, type PreconnectTarget } from "./preconnect";
+export * from "./prefetch";
 
-export interface ScramjetFetchRequest {
+export interface RamjetFetchRequest {
 	rawUrl: URL;
 	rawReferrer: string | null;
-	// use parsed.destination instead
+
 	rawDestination: RequestDestination;
 	mode: RequestMode;
 	referrer: string;
@@ -24,50 +27,44 @@ export interface ScramjetFetchRequest {
 	body: BodyType | null;
 	cache: RequestCache;
 
-	initialHeaders: ScramjetHeaders;
+	initialHeaders: RamjetHeaders;
 
 	rawClientUrl?: URL;
 
-	/** The service worker FetchEvent.clientId that originated this request. */
-	clientId: string;
+	clientId?: string;
+
+	prefetch?: boolean;
 }
 
-export interface ScramjetFetchParsed {
+export interface RamjetFetchParsed {
 	url: _URL;
 	clientUrl?: _URL;
 	referrerSourceUrl?: _URL | null;
 	hadExtraParams: boolean;
 	crossSiteRedirect: boolean;
 
-	// track the worst case Sec-Fetch-Site classification through redirects
 	fetchSiteState?: "same-origin" | "same-site" | "cross-site";
 
-	// origin of the page that initialized the request
-	// specifically for tracking Sec-Fetch-Site, don't use for anything else, it will diverge from clientUrl in some cases
 	fetchInitiatorOrigin?: string;
 
-	// was the request made with credentials=include?
 	fetchCredentialsInclude?: boolean;
 
-	// tracks RequestInit.mode if set
-	fetchMode?: ScramjetRequestMode;
+	fetchMode?: RamjetRequestMode;
 
-	// was this request made by an iframe? (scramjet's definition of an iframe, not the browser's)
 	isIframe?: boolean;
 
-	// request.destination, but is overridden by $dest
 	destination: RequestDestination;
 
 	meta: URLMeta;
 	isModule: boolean;
 	isFakeDataURL: boolean;
 	referrerPolicy?: string;
-	trackedClient?: ScramjetFetchTrackedClient;
+	trackedClient?: RamjetFetchTrackedClient;
 }
 
-export interface ScramjetFetchResponse {
+export interface RamjetFetchResponse {
 	body: BodyType;
-	headers: ScramjetHeaders;
+	headers: RamjetHeaders;
 	status: number;
 	statusText: string;
 }
@@ -84,12 +81,18 @@ export type CookieSyncOptions = {
 
 export type FetchHandlerInit = {
 	transport: ProxyTransport;
-	context: ScramjetContext;
+	context: RamjetContext;
 	crossOriginIsolated?: boolean;
+
+	streamHtml?: boolean;
+
+	browserHeaders?: (url: URL) => [string, string][];
+
+	prefetch?: Partial<PrefetchOptions> | false;
 
 	sendSetCookie: (
 		cookies: CookieSyncEntry[],
-		options?: CookieSyncOptions
+		options?: CookieSyncOptions,
 	) => Promise<void>;
 	fetchDataUrl(dataUrl: string): Promise<BareResponse>;
 	fetchBlobUrl(blobUrl: string): Promise<BareResponse>;
@@ -99,18 +102,25 @@ export type TrackedHistoryState = {
 	url: string;
 	refererPolicy?: string;
 };
-export class ScramjetFetchTrackedClient {
+export class RamjetFetchTrackedClient {
 	history: TrackedHistoryState[] = [];
 	constructor(public clientId: string) {}
 }
 
-// eslint-disable-next-line scramjet-core/no-globals
-export class ScramjetFetchHandler extends EventTarget {
+// eslint-disable-next-line ramjet-core/no-globals
+export class RamjetFetchHandler extends EventTarget {
 	public client: BareCompatibleClient;
 	public crossOriginIsolated: boolean = false;
-	public context: ScramjetContext;
+	public context: RamjetContext;
 
-	public trackedClients = new _Map<string, ScramjetFetchTrackedClient>();
+	public trackedClients: Map<string, RamjetFetchTrackedClient> = new _Map<
+		string,
+		RamjetFetchTrackedClient
+	>();
+	public browserHeaders?: (url: URL) => [string, string][];
+	public prefetcher: Prefetcher;
+	public preconnector: Preconnector;
+	public streamHtml: boolean;
 
 	public hooks: {
 		rewriter: {
@@ -123,7 +133,7 @@ export class ScramjetFetchHandler extends EventTarget {
 	public fetchBlobUrl: (blobUrl: string) => Promise<Response>;
 	public sendSetCookie: (
 		cookies: CookieSyncEntry[],
-		options?: CookieSyncOptions
+		options?: CookieSyncOptions,
 	) => Promise<void>;
 
 	constructor(init: FetchHandlerInit) {
@@ -134,6 +144,17 @@ export class ScramjetFetchHandler extends EventTarget {
 		this.sendSetCookie = init.sendSetCookie;
 		this.fetchDataUrl = init.fetchDataUrl;
 		this.fetchBlobUrl = init.fetchBlobUrl;
+		this.streamHtml = init.streamHtml !== false;
+		this.browserHeaders = init.browserHeaders;
+		this.prefetcher = new Prefetcher(
+			this,
+			init.prefetch === false ? { enabled: false } : init.prefetch,
+		);
+		this.preconnector = new Preconnector(
+			() => this.client.transport as PreconnectTarget,
+			() => this.context,
+			this.prefetcher.options.preconnect,
+		);
 		this.hooks = {
 			rewriter: {
 				html: Tap.create<HtmlRewriterHooks>(),
@@ -145,26 +166,24 @@ export class ScramjetFetchHandler extends EventTarget {
 		};
 	}
 
-	async handleFetch(
-		request: ScramjetFetchRequest
-	): Promise<ScramjetFetchResponse> {
+	async handleFetch(request: RamjetFetchRequest): Promise<RamjetFetchResponse> {
 		return doHandleFetch(this, request);
 	}
 }
 export type FetchHooks = {
 	intercept: {
 		context: {
-			request: ScramjetFetchRequest;
-			parsed: ScramjetFetchParsed;
+			request: RamjetFetchRequest;
+			parsed: RamjetFetchParsed;
 		};
 		props: {
-			response?: ScramjetFetchResponse;
+			response?: RamjetFetchResponse;
 		};
 	};
 	request: {
 		context: {
-			request: ScramjetFetchRequest;
-			parsed: ScramjetFetchParsed;
+			request: RamjetFetchRequest;
+			parsed: RamjetFetchParsed;
 			client: BareCompatibleClient;
 		};
 		props: {
@@ -175,8 +194,8 @@ export type FetchHooks = {
 	};
 	preresponse: {
 		context: {
-			request: ScramjetFetchRequest;
-			parsed: ScramjetFetchParsed;
+			request: RamjetFetchRequest;
+			parsed: RamjetFetchParsed;
 		};
 		props: {
 			response: BareResponse;
@@ -184,11 +203,11 @@ export type FetchHooks = {
 	};
 	response: {
 		context: {
-			request: ScramjetFetchRequest;
-			parsed: ScramjetFetchParsed;
+			request: RamjetFetchRequest;
+			parsed: RamjetFetchParsed;
 		};
 		props: {
-			response: ScramjetFetchResponse;
+			response: RamjetFetchResponse;
 		};
 	};
 };

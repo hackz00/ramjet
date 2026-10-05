@@ -1,11 +1,5 @@
 import { basicTest } from "../../testcommon.ts";
 
-// The window/document surface a page reads on startup: readiness and lifecycle
-// events, the Navigation API that modern routers prefer over history, media
-// queries, viewport metrics and graphics contexts. Feature detection here
-// decides which code path a site takes, so a missing or wrong value changes
-// behaviour long before anything visibly breaks.
-
 export default [
 	basicTest({
 		name: "windoc-lifecycle",

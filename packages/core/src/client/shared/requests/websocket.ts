@@ -1,5 +1,5 @@
 import { type BareCompatibleWebSocket } from "@mercuryworkshop/proxy-transports";
-import { ScramjetClient } from "@client/index";
+import { RamjetClient } from "@client/index";
 import {
 	Object_setPrototypeOf,
 	Reflect_get,
@@ -30,7 +30,7 @@ type FakeWebSocketStreamState = {
 	readable: ReadableStream;
 	writable: WritableStream;
 };
-export default function (client: ScramjetClient, self: GlobalThis) {
+export default function (client: RamjetClient, self: GlobalThis) {
 	const socketmap: WeakMap<WebSocket, FakeWebSocketState> =
 		new _WeakMap() as WeakMap<WebSocket, FakeWebSocketState>;
 	const socketstreammap: WeakMap<WebSocketStream, FakeWebSocketStreamState> =
@@ -41,15 +41,14 @@ export default function (client: ScramjetClient, self: GlobalThis) {
 			Object_setPrototypeOf(fakeWebSocket, ctx.fn.prototype);
 			fakeWebSocket.constructor = ctx.fn;
 
-			// websockets can take relative URLs
 			let rawurl = new _URL(ctx.args[0], client.url.href);
 			if (rawurl.protocol === "http:") {
 				rawurl = new _URL(
-					"ws:" + rawurl.href.substring(rawurl.protocol.length)
+					"ws:" + rawurl.href.substring(rawurl.protocol.length),
 				);
 			} else if (rawurl.protocol === "https:") {
 				rawurl = new _URL(
-					"wss:" + rawurl.href.substring(rawurl.protocol.length)
+					"wss:" + rawurl.href.substring(rawurl.protocol.length),
 				);
 			}
 			const url = rawurl.href;
@@ -96,16 +95,13 @@ export default function (client: ScramjetClient, self: GlobalThis) {
 			barews.addEventListener("message", async (ev) => {
 				let payload = ev.data;
 				if (typeof payload === "string") {
-					// DO NOTHING
 				} else if ("byteLength" in payload) {
-					// arraybuffer, convert to blob if needed or set the proper prototype
 					if (state.binaryType === "blob") {
 						payload = new Blob([payload]);
 					} else {
 						Object_setPrototypeOf(payload, ArrayBuffer.prototype);
 					}
 				} else if ("arrayBuffer" in payload) {
-					// blob, convert to arraybuffer if neccesary.
 					if (state.binaryType === "arraybuffer") {
 						payload = await payload.arrayBuffer();
 						Object_setPrototypeOf(payload, ArrayBuffer.prototype);
@@ -310,15 +306,11 @@ export default function (client: ScramjetClient, self: GlobalThis) {
 					start(controller) {
 						barews.addEventListener("message", async (ev: MessageEvent) => {
 							let payload = ev.data;
-							// TODO: this needs to be changed to uint8array later
-							// chrome isnt following spec though so we are just going to do this
+
 							if (typeof payload === "string") {
-								// DO NOTHING
 							} else if ("byteLength" in payload) {
-								// arraybuffer, set the realms prototype so its recognized
 								Object.setPrototypeOf(payload, ArrayBuffer.prototype);
 							} else if ("arrayBuffer" in payload) {
-								// blob, convert to arraybuffer
 								payload = await payload.arrayBuffer();
 								Object.setPrototypeOf(payload, ArrayBuffer.prototype);
 							}
@@ -379,7 +371,7 @@ export default function (client: ScramjetClient, self: GlobalThis) {
 				if (ctx.args[0].reason === undefined) ctx.args[0].reason = "";
 
 				return ctx.return(
-					ws.barews.close(ctx.args[0].closeCode, ctx.args[0].reason)
+					ws.barews.close(ctx.args[0].closeCode, ctx.args[0].reason),
 				);
 			}
 

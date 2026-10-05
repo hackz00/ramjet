@@ -16,8 +16,9 @@ import {
 	printBanner,
 } from "./devlib.ts";
 import rspackConfig from "./rspack.config.ts";
+import { startAssistedServer } from "./packages/assisted-server/src/server.ts";
 
-const image = await fs.readFile("./assets/scramjet-mini-noalpha.png");
+const image = await fs.readFile("./assets/ramjet-mini-noalpha.display.png");
 
 const commit = execSync("git rev-parse --short HEAD", {
 	encoding: "utf-8",
@@ -30,12 +31,19 @@ const version = packagejson.version;
 
 const DEMO_PORT = process.env.DEMO_PORT || 4141;
 const WISP_PORT = process.env.WISP_PORT || 4142;
+const ASSISTED_PORT = process.env.ASSISTED_PORT || 4143;
 
 if (process.env.VITE_WISP_URL) {
 	process.env.VITE_WISP_URL = normalizeWebsocketUrl(process.env.VITE_WISP_URL);
 } else {
 	process.env.VITE_WISP_URL = `ws://localhost:${WISP_PORT}/`;
 }
+
+process.env.VITE_ASSISTED_URL ??= `ws://localhost:${ASSISTED_PORT}/assisted`;
+await startAssistedServer({
+	port: Number(ASSISTED_PORT),
+	guard: { allowPrivate: true },
+});
 
 const wispserver = http.createServer((req, res) => {
 	res.writeHead(200, { "Content-Type": "text/plain" });
@@ -48,7 +56,7 @@ wispserver.on("upgrade", (req, socket, head) => {
 	wisp.routeRequest(req, socket, head);
 });
 
-wispserver.listen(Number(WISP_PORT));
+wispserver.listen(Number(WISP_PORT), "127.0.0.1");
 
 const server = await createServer({
 	configFile: "./packages/demo/vite.config.ts",
@@ -70,18 +78,18 @@ const note = (text: string) => chalk.hex("#CDB4DB")(text);
 const connector = chalk.hex("#8D99AE").dim("@");
 
 const lines = [
-	black()(`${highlight("SCRAMJET DEV SERVER")}`),
+	black()(`${highlight("RAMJET DEV SERVER")}`),
 	black()(
 		`${accent("demo")} ${connector} ${urlColor(
-			`http://localhost:${DEMO_PORT}/`
-		)}`
+			`http://localhost:${DEMO_PORT}/`,
+		)}`,
 	),
 	black()(
 		`${accent("wisp")} ${connector} ${urlColor(
-			process.env.VITE_WISP_URL ?? ""
-		)}`
+			process.env.VITE_WISP_URL ?? "",
+		)}`,
 	),
-	black()(chalk.dim(`[${branch}] ${commit} scramjet/${version}`)),
+	black()(chalk.dim(`[${branch}] ${commit} ramjet/${version}`)),
 ];
 
 runRspack(rspackConfig);

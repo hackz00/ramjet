@@ -1,9 +1,5 @@
 import { basicTest } from "../../testcommon.ts";
 
-// HTMLElement.prototype.innerText trap: shares its rewrite-and-stash logic
-// with the Node.prototype.textContent trap. These tests guard the script /
-// style branches against regressing the dedup.
-
 export default [
 	basicTest({
 		name: "innertext-script-roundtrip",

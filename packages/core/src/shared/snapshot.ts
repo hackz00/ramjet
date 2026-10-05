@@ -1,12 +1,9 @@
-// this is a place for storing stateless globals that will be used by shared/
-// this is NOT a place for putting dom apis
-
 export const String = globalThis.String;
 export const String_fromCodePoint = globalThis.String.fromCodePoint;
 export const String_fromCharCode = globalThis.String.fromCharCode;
 const Function_prototype_call = globalThis.Function.prototype.call;
 export const String_startsWith = Function_prototype_call.bind(
-	globalThis.String.prototype.startsWith
+	globalThis.String.prototype.startsWith,
 ) as (str: string, searchString: string, position?: number) => boolean;
 export const Number = globalThis.Number;
 export const Number_parseInt = globalThis.Number.parseInt;
@@ -53,26 +50,32 @@ export const Performance_now = performance.now.bind(performance);
 export const btoa = globalThis.btoa;
 export const atob = globalThis.atob;
 export const URL_createObjectURL = globalThis.URL.createObjectURL.bind(
-	globalThis.URL
+	globalThis.URL,
 );
 export const URL_revokeObjectURL = globalThis.URL.revokeObjectURL.bind(
-	globalThis.URL
+	globalThis.URL,
 );
 
-export const Error = globalThis.Error;
+export const Error = globalThis.Error as ErrorConstructor & {
+	stackTraceLimit: number;
+	prepareStackTrace?: (
+		error: Error,
+		frames: { getFileName(): string | null }[],
+	) => unknown;
+};
 export const Math_random = globalThis.Math.random;
 export const Math_min = globalThis.Math.min;
 
 export const Promise_all = globalThis.Promise.all.bind(globalThis.Promise);
 export const Promise_race = globalThis.Promise.race.bind(globalThis.Promise);
 export const Promise_resolve = globalThis.Promise.resolve.bind(
-	globalThis.Promise
+	globalThis.Promise,
 );
 export const Promise_reject = globalThis.Promise.reject.bind(
-	globalThis.Promise
+	globalThis.Promise,
 );
 export const Promise_allSettled = globalThis.Promise.allSettled.bind(
-	globalThis.Promise
+	globalThis.Promise,
 );
 export const Promise_any = globalThis.Promise.any.bind(globalThis.Promise);
 
@@ -94,10 +97,10 @@ type InstantiatePrototype<P, Params extends unknown[]> = Params extends [
 			? Map<A, B>
 			: P
 	: Params extends [infer A]
-		? P extends WeakSet<any>
-			? WeakSet<A & object>
-			: P extends Set<any>
-				? Set<A>
+		? P extends Set<any>
+			? Set<A>
+			: P extends WeakSet<any>
+				? WeakSet<A & object>
 				: P
 		: P;
 
@@ -132,20 +135,16 @@ type WrappedConstructor<T> =
 						new <K extends WeakKey, V>(...args: Args) => Wrapped<WeakMap<K, V>>
 					>
 				: never
-			: ConstructorPrototype<T> extends WeakSet<any>
-				? T extends { new <U extends object>(...args: infer Args): any }
-					? WrappedCtor<
-							T,
-							[object],
-							new <U extends object>(...args: Args) => Wrapped<WeakSet<U>>
-						>
+			: ConstructorPrototype<T> extends Set<any>
+				? T extends { new <U>(...args: infer Args): any }
+					? WrappedCtor<T, [unknown], new <U>(...args: Args) => Wrapped<Set<U>>>
 					: never
-				: ConstructorPrototype<T> extends Set<any>
-					? T extends { new <U>(...args: infer Args): any }
+				: ConstructorPrototype<T> extends WeakSet<any>
+					? T extends { new <U extends object>(...args: infer Args): any }
 						? WrappedCtor<
 								T,
-								[unknown],
-								new <U>(...args: Args) => Wrapped<Set<U>>
+								[object],
+								new <U extends object>(...args: Args) => Wrapped<WeakSet<U>>
 							>
 						: never
 					: T extends { new <K, V>(...args: infer Args): any }
@@ -210,8 +209,6 @@ export const _TextEncoder = makeWrap(globalThis.TextEncoder);
 export type _TextEncoder = Wrapped<TextEncoder>;
 
 export function makeWrap<T extends object>(source: T): Wrapped<T> {
-	// Constructable builtins like Set/Map/URL need to retain their [[Construct]]
-	// behavior; cloning them into plain objects breaks `new _Set(...)`.
 	if (typeof source === "function") {
 		return new Proxy(source, {}) as Wrapped<T>;
 	}
@@ -228,21 +225,19 @@ export function makeWrap<T extends object>(source: T): Wrapped<T> {
 		return descriptors;
 	}
 
-	// Recursively clone prototype chain
 	function clonePrototypeChain(obj: object | null): object | null {
 		if (obj === null) return null;
 		const proto = Object.getPrototypeOf(obj);
-		// The chain ends at null (root), otherwise recursively clone up the chain
+
 		const clonedProto = clonePrototypeChain(proto);
-		// Clone current object's own props and set prototype to cloned parent
+
 		const clone = Object.create(clonedProto, getAllPropertyDescriptors(obj));
 		return clone;
 	}
 
-	// Actually clone the source itself (including own properties)
 	const wrapped = Object.create(
 		clonePrototypeChain(Object.getPrototypeOf(source)),
-		getAllPropertyDescriptors(source)
+		getAllPropertyDescriptors(source),
 	);
 
 	return wrapped as Wrapped<T>;

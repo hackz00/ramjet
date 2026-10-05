@@ -1,10 +1,5 @@
 import { serverTest, basicTest } from "../../testcommon.ts";
 
-// Same-origin frames are the trickiest shape for a proxy: each frame gets its
-// own client, and the page can reach across into another frame's document and
-// read URLs there. Nothing here currently diverges - this is regression cover
-// for an area with no existing tests.
-
 const frameTest = (name: string, js: string) =>
 	serverTest({
 		name,
@@ -19,14 +14,14 @@ const frameTest = (name: string, js: string) =>
 					res.writeHead(200, { "Content-Type": "text/html" });
 					res.end(
 						'<!DOCTYPE html><html><body><a id="l" href="/inframe">x</a>' +
-							'<img id="i" src="/inframe.png"></body></html>'
+							'<img id="i" src="/inframe.png"></body></html>',
 					);
 					return;
 				}
 				if (path === "/nested.html") {
 					res.writeHead(200, { "Content-Type": "text/html" });
 					res.end(
-						'<!DOCTYPE html><html><body><iframe src="/frame.html"></iframe></body></html>'
+						'<!DOCTYPE html><html><body><iframe src="/frame.html"></iframe></body></html>',
 					);
 					return;
 				}
@@ -56,7 +51,7 @@ export default [
 			assertEqual(doc.baseURI, location.origin + "/frame.html", "frame baseURI");
 			assertEqual(doc.URL, location.origin + "/frame.html", "frame document.URL");
 			assertEqual(f.getAttribute("src"), "/frame.html", "the src attribute keeps the literal value");
-		`
+		`,
 	),
 	frameTest(
 		"frames-collection-and-relationships",
@@ -75,7 +70,7 @@ export default [
 			assertEqual(f.contentWindow.top, window.top, "top agrees");
 			assertEqual(f.contentWindow.self, f.contentWindow, "self inside the frame");
 			assertEqual(document.querySelectorAll("iframe").length, 1, "one iframe in the document");
-		`
+		`,
 	),
 	frameTest(
 		"frames-nested",
@@ -95,7 +90,7 @@ export default [
 				location.origin + "/inframe",
 				"URL resolution two levels down"
 			);
-		`
+		`,
 	),
 	frameTest(
 		"frames-cross-document-scripting",
@@ -115,7 +110,7 @@ export default [
 			child.body.innerHTML += '<a id="added" href="/added">y</a>';
 			assertEqual(child.querySelector("#added").href, location.origin + "/added", "markup written into the child");
 			assertEqual(f.contentWindow.document, child, "contentWindow.document === contentDocument");
-		`
+		`,
 	),
 	basicTest({
 		name: "frames-srcdoc",

@@ -1,19 +1,5 @@
 import { serverTest } from "../../testcommon.ts";
 
-// document.cookie is emulated against the proxy's own jar, so a script write
-// has to be reflected in two places: back through document.cookie, and in the
-// Cookie header of subsequent requests.
-//
-// Existing coverage (tests/cookies.ts) checks the server-to-script direction.
-// These go the other way, which is the direction the classic pattern uses:
-//   document.cookie = "csrftoken=…"; fetch("/api", {method: "POST"})
-//
-// The write reaches the jar asynchronously, so a request issued in the same task
-// can go out without the cookie - reproducible on an idle machine with either
-// fetch or a synchronous XHR, but it stops reproducing under load, so it is not
-// asserted here. What is asserted is the shape around it: the cookie is present
-// after a short delay, and after any intervening request.
-
 const jarTest = (name: string, js: string) =>
 	serverTest({
 		name,
@@ -47,7 +33,7 @@ export default [
 			document.cookie = "b=2; Path=/";
 			assert(document.cookie.includes("b=2"), "a second cookie: " + document.cookie);
 			assert(document.cookie.includes("a=1"), "the first one survives: " + document.cookie);
-		`
+		`,
 	),
 	jarTest(
 		"ckjar-overwrite",
@@ -56,7 +42,7 @@ export default [
 			document.cookie = "o=second; Path=/";
 			const matches = document.cookie.split("; ").filter((c) => c.startsWith("o="));
 			assertDeepEqual(matches, ["o=second"], "overwriting replaces rather than duplicates: " + document.cookie);
-		`
+		`,
 	),
 	jarTest(
 		"ckjar-delete",
@@ -68,7 +54,7 @@ export default [
 			document.cookie = "e=1; Path=/";
 			document.cookie = "e=1; Path=/; Max-Age=0";
 			assert(!document.cookie.includes("e=1"), "Max-Age=0 removes it: " + document.cookie);
-		`
+		`,
 	),
 	jarTest(
 		"ckjar-path-scoping",
@@ -78,7 +64,7 @@ export default [
 				"a cookie scoped to another path must not be readable here: " + document.cookie);
 			document.cookie = "here=v; Path=/";
 			assert(document.cookie.includes("here=v"), "Path=/ is readable: " + document.cookie);
-		`
+		`,
 	),
 	jarTest(
 		"ckjar-value-encoding",
@@ -87,7 +73,7 @@ export default [
 			assert(document.cookie.includes("enc=a%20b%26c%3Dd"), "an encoded value round trips verbatim: " + document.cookie);
 			document.cookie = "eq=x=y; Path=/";
 			assert(document.cookie.includes("eq=x=y"), "a value containing = is preserved: " + document.cookie);
-		`
+		`,
 	),
 	jarTest(
 		"ckjar-server-cookie-sent",
@@ -96,7 +82,7 @@ export default [
 			const j = await (await fetch("/echo")).json();
 			assert((j.cookie || "").includes("srv=srvvalue"), "a server-set cookie is sent: " + JSON.stringify(j.cookie));
 			assert(document.cookie.includes("srv=srvvalue"), "and is visible to script: " + document.cookie);
-		`
+		`,
 	),
 	jarTest(
 		"ckjar-script-cookie-sent-eventually",
@@ -107,7 +93,7 @@ export default [
 			await new Promise((r) => setTimeout(r, 300));
 			const j = await (await fetch("/echo")).json();
 			assert((j.cookie || "").includes("later=v"), "sent after a delay: " + JSON.stringify(j.cookie));
-		`
+		`,
 	),
 	jarTest(
 		"ckjar-script-cookie-sent-after-request",
@@ -116,8 +102,6 @@ export default [
 			await fetch("/echo");
 			const j = await (await fetch("/echo")).json();
 			assert((j.cookie || "").includes("afterreq=v"), "sent on the second request: " + JSON.stringify(j.cookie));
-		`
+		`,
 	),
-
-	// ------------------------------------------------------------------
 ];

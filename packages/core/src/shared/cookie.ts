@@ -1,4 +1,3 @@
-// thnank you node unblocker guy
 import { JSON_parse, JSON_stringify } from "@/shared/snapshot";
 import { _Date } from "./snapshot";
 import parse from "./set-cookie-parser";
@@ -13,12 +12,12 @@ export type Cookie = {
 	hostOnly?: boolean;
 	secure?: boolean;
 	httpOnly?: boolean;
-	sameSite?: string; // "strict"|"lax"|"none" or titlecase variants from parsers
+	sameSite?: string;
 };
 
 export class CookieJar {
 	private cookies: Record<string, Cookie> = {};
-	// Index by domain (without leading dot)
+
 	private byDomain: Map<string, Cookie[]> = new Map();
 
 	private defaultPath(url: URL): string {
@@ -111,21 +110,16 @@ export class CookieJar {
 		}
 	}
 
-	// SameSite enforcement context passed to getCookies.
-	// "strict"     – same-site request; all cookies allowed
-	// "lax"        – cross-site top-level GET/HEAD navigation; Strict blocked, Lax+None allowed
-	// "cross-site" – cross-site subresource or non-GET navigation; only None allowed
 	getCookies(
 		url: URL,
 		fromJs: boolean,
-		sameSiteContext: "strict" | "lax" | "cross-site" = "strict"
+		sameSiteContext: "strict" | "lax" | "cross-site" = "strict",
 	): string {
 		const now = _Date.now();
 		const hostname = url.hostname;
 		const pathname = url.pathname;
 		const validCookies: Cookie[] = [];
 
-		// Walk the hostname's domain suffix chain
 		let key: string | undefined = hostname;
 		while (key !== undefined) {
 			const bucket = this.byDomain.get(key);
@@ -135,23 +129,15 @@ export class CookieJar {
 
 					if (cookie.hostOnly && key !== hostname) continue;
 
-					// Scramjet proxies all origins as HTTPS (including those served over HTTP),
-					// so we don't enforce the Secure attribute based on protocol here.
-					// if (cookie.secure && url.protocol !== "https:") continue;
 					if (cookie.httpOnly && fromJs) continue;
 					if (!this.pathMatches(pathname, cookie.path!)) continue;
 
-					// SameSite enforcement — compare case-insensitively since parsers may
-					// return "Strict"/"Lax"/"None" (titlecase) or "strict"/"lax"/"none".
 					const cs = (cookie.sameSite ?? "lax").toLowerCase();
 					if (sameSiteContext === "cross-site") {
-						// Only SameSite=None cookies are sent cross-site
 						if (cs !== "none") continue;
 					} else if (sameSiteContext === "lax") {
-						// Lax top-level navigation: block Strict, allow Lax and None
 						if (cs === "strict") continue;
 					}
-					// "strict" context: all cookies allowed (no filtering)
 
 					validCookies.push(cookie);
 				}
@@ -162,7 +148,7 @@ export class CookieJar {
 
 		return validCookies
 			.map((cookie) =>
-				cookie.name ? `${cookie.name}=${cookie.value}` : cookie.value
+				cookie.name ? `${cookie.name}=${cookie.value}` : cookie.value,
 			)
 			.join("; ");
 	}
@@ -195,5 +181,22 @@ export class CookieJar {
 
 	dump(): string {
 		return JSON_stringify(this.cookies);
+	}
+
+	dumpFor(url: URL): string {
+		const hostname = url.hostname;
+		const now = _Date.now();
+		const out: Record<string, Cookie> = {};
+		for (const id of Object.keys(this.cookies)) {
+			const cookie = this.cookies[id];
+			if (cookie.expires !== undefined && cookie.expires < now) continue;
+			const domain = cookie.domain!.slice(1);
+			if (
+				hostname === domain ||
+				(!cookie.hostOnly && hostname.endsWith("." + domain))
+			)
+				out[id] = cookie;
+		}
+		return JSON_stringify(out);
 	}
 }

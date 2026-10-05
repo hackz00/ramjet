@@ -1,25 +1,21 @@
 {
-	"name": "@mercuryworkshop/scramjet-utils",
+	"name": "@ramjet/utils",
 	"version": "0.0.3",
-	"description": "Utilities for Scramjet proxy integrations",
+	"description": "Utilities for Ramjet proxy integrations",
 	"type": "module",
 	"packageManager": "pnpm@10.12.1",
 	"license": "AGPL-3.0-only",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/MercuryWorkshop/scramjet.git",
-		"directory": "packages/utils"
-	},
 	"types": "./dist/types/typesEntry.d.ts",
 	"exports": {
 		".": {
 			"types": "./dist/types/typesEntry.d.ts",
-			"import": "./dist/scramjet-utils.mjs",
-			"default": "./dist/scramjet-utils.js"
+			"import": "./dist/ramjet-utils.mjs",
+			"default": "./dist/ramjet-utils.js"
 		}
 	},
 	"files": [
-		"dist"
+		"dist",
+		"!dist/temp-types-build"
 	],
 	"scripts": {
 		"build": "cd ../.. && rspack build --mode production",
@@ -28,12 +24,21 @@
 		"pub": "pnpm publish --no-git-checks --access public"
 	},
 	"peerDependencies": {
-		"@mercuryworkshop/scramjet": "*",
-		"@mercuryworkshop/scramjet-controller": "*"
+		"@ramjet/core": "*",
+		"@ramjet/controller": "*"
 	},
 	"devDependencies": {
-		"@mercuryworkshop/scramjet": "workspace:*",
-		"@mercuryworkshop/scramjet-controller": "workspace:*",
+		"@ramjet/core": "workspace:*",
+		"@ramjet/controller": "workspace:*",
 		"@types/serviceworker": "^0.0.197"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/hackz00/ramjet.git",
+		"directory": "packages/utils"
+	},
+	"homepage": "https://github.com/hackz00/ramjet#readme",
+	"bugs": {
+		"url": "https://github.com/hackz00/ramjet/issues"
 	}
 }

@@ -1,10 +1,10 @@
 import { Object_entries, Object_keys, _URL, Error } from "@/shared/snapshot";
 import { unrewriteUrl, URLMeta } from "@rewriters/url";
 import {
-	ScramjetFetchHandler,
-	ScramjetFetchParsed,
-	ScramjetFetchRequest,
-	ScramjetFetchTrackedClient,
+	RamjetFetchHandler,
+	RamjetFetchParsed,
+	RamjetFetchRequest,
+	RamjetFetchTrackedClient,
 } from ".";
 
 export const QP = {
@@ -24,6 +24,7 @@ export const QP = {
 } as const;
 
 export type QueryParamKey = keyof typeof QP;
+export type RamjetRequestMode = "cors" | "no-cors" | "same-origin" | "navigate";
 
 export type QueryParams = Partial<Record<QueryParamKey, string>>;
 
@@ -47,7 +48,7 @@ export function parseQueryParams(searchParams: URLSearchParams): {
 			params[logical] = value;
 		} else {
 			dbg.warn(
-				`extraneous query parameter ${key}=${value}. Assuming <form> element`
+				`extraneous query parameter ${key}=${value}. Assuming <form> element`,
 			);
 			extras[key] = value;
 		}
@@ -56,9 +57,9 @@ export function parseQueryParams(searchParams: URLSearchParams): {
 }
 
 export function parseRequest(
-	request: ScramjetFetchRequest,
-	handler: ScramjetFetchHandler
-): ScramjetFetchParsed {
+	request: RamjetFetchRequest,
+	handler: RamjetFetchHandler,
+): RamjetFetchParsed {
 	const strippedUrl = new _URL(request.rawUrl.href);
 	const { params, extras } = parseQueryParams(request.rawUrl.searchParams);
 	strippedUrl.search = "";
@@ -71,9 +72,8 @@ export function parseRequest(
 	const url = new _URL(unrewriteUrl(strippedUrl, handler.context));
 
 	if (url.origin === new _URL(request.rawUrl).origin) {
-		// uh oh!
 		throw new Error(
-			"attempted to fetch from same origin - this means the site has obtained a reference to the real origin, aborting"
+			"attempted to fetch from same origin - this means the site has obtained a reference to the real origin, aborting",
 		);
 	}
 
@@ -82,11 +82,11 @@ export function parseRequest(
 	}
 
 	const clientId = request.clientId;
-	let trackedClient: ScramjetFetchTrackedClient | undefined;
+	let trackedClient: RamjetFetchTrackedClient | undefined;
 	if (clientId) {
 		trackedClient = handler.trackedClients.get(clientId);
 		if (!trackedClient) {
-			trackedClient = new ScramjetFetchTrackedClient(clientId);
+			trackedClient = new RamjetFetchTrackedClient(clientId);
 			handler.trackedClients.set(clientId, trackedClient);
 		}
 	}
@@ -105,10 +105,13 @@ export function parseRequest(
 			? params.fetchSite
 			: undefined;
 
-	const fetchMode = ["cors", "no-cors", "same-origin", "navigate"].includes(
-		params.mode
-	)
-		? params.mode
+	const fetchMode: RamjetRequestMode | undefined = [
+		"cors",
+		"no-cors",
+		"same-origin",
+		"navigate",
+	].includes(params.mode)
+		? (params.mode as RamjetRequestMode)
 		: undefined;
 	const destination =
 		(params.destination as RequestDestination | undefined) ||
@@ -122,7 +125,7 @@ export function parseRequest(
 		referrerPolicy: params.referrerPolicy,
 	};
 
-	const parsed: ScramjetFetchParsed = {
+	const parsed: RamjetFetchParsed = {
 		meta,
 		url,
 		isModule: params.isModule === "module",
@@ -133,7 +136,7 @@ export function parseRequest(
 		crossSiteRedirect: params.crossSiteRedirect === "1",
 		fetchSiteState,
 		fetchInitiatorOrigin: params.initiatorOrigin || undefined,
-		// TODO: should really just be a boolean
+
 		fetchCredentialsInclude: params.credentials === "include",
 		fetchMode,
 		destination,
@@ -143,7 +146,7 @@ export function parseRequest(
 
 	if (request.rawClientUrl) {
 		parsed.clientUrl = new _URL(
-			unrewriteUrl(request.rawClientUrl, handler.context)
+			unrewriteUrl(request.rawClientUrl, handler.context),
 		);
 	}
 

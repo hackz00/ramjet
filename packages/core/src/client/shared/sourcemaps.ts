@@ -3,8 +3,8 @@ import {
 	Number_isSafeInteger,
 	Error,
 } from "@/shared/snapshot";
-import { SCRAMJETCLIENT, SCRAMJETCLIENTNAME } from "@/symbols";
-import { ProxyCtx, ScramjetClient } from "@client/index";
+import { RAMJETCLIENT, RAMJETCLIENTNAME } from "@/symbols";
+import { ProxyCtx, RamjetClient } from "@client/index";
 
 enum RewriteType {
 	Insert = 0,
@@ -37,9 +37,9 @@ function getEnd(rewrite: Rewrite): number {
 }
 
 function registerRewrites(
-	client: ScramjetClient,
+	client: RamjetClient,
 	buf: Array<number>,
-	tag: string
+	tag: string,
 ) {
 	const sourcemap = Uint8Array.from(buf);
 	const view = new DataView(sourcemap.buffer);
@@ -67,7 +67,7 @@ function registerRewrites(
 			cursor += 4;
 
 			const oldStr = decoder.decode(
-				sourcemap.subarray(cursor, cursor + oldLen)
+				sourcemap.subarray(cursor, cursor + oldLen),
 			);
 
 			rewrites.push({ type, start, end, str: oldStr });
@@ -81,12 +81,8 @@ function registerRewrites(
 const SCRAMTAG = "/*scramtag ";
 
 function extractTag(fn: string): [string, number, number] | null {
-	// every function rewritten will have a scramtag comment
-	// it will look like this:
-	// function name()[possible whitespace]/*scramtag [index] [tag]*/[possible whitespace]{ ... }
-
 	const start = fn.indexOf(SCRAMTAG);
-	// no scramtag, probably native function or stolen from scramjet
+
 	if (start === -1) return null;
 
 	const end = fn.indexOf("*/", start);
@@ -110,8 +106,8 @@ function extractTag(fn: string): [string, number, number] | null {
 }
 
 function doUnrewrite(
-	client: ScramjetClient,
-	ctx: ProxyCtx<"Function.prototype.toString", "apply">
+	client: RamjetClient,
+	ctx: ProxyCtx<"Function.prototype.toString", "apply">,
 ) {
 	const stringified: string = ctx.fn.call(ctx.this);
 
@@ -130,7 +126,7 @@ function doUnrewrite(
 	}
 
 	let i = 0;
-	// skip all rewrites in the file before the fn
+
 	while (i < rewrites.length) {
 		if (rewrites[i].start < fnStart) i++;
 		else break;
@@ -165,39 +161,28 @@ function doUnrewrite(
 	return ctx.return(newString);
 }
 
-export const enabled = (client: ScramjetClient) =>
+export const enabled = (client: RamjetClient) =>
 	client.flagEnabled("sourcemaps");
 
-export default function (client: ScramjetClient, self: Self) {
-	// every script will push a sourcemap
+export default function (client: RamjetClient, self: Self) {
 	Object_defineProperty(self, client.config.globals.pushsourcemapfn, {
 		value: (buf: Array<number>, tag: string) => {
-			// const before = performance.now();
 			registerRewrites(client, buf, tag);
-			// if (client.flagEnabled("rewriterLogs")) {
-			// 	dbg.time(client.meta, before, `scramtag parse for ${tag}`);
-			// }
 		},
 		enumerable: false,
 		writable: false,
 		configurable: false,
 	});
 
-	// when we rewrite javascript it will make function.toString leak internals
-	// this can lead to double rewrites which is bad
 	client.Proxy("Function.prototype.toString", {
 		apply(ctx) {
 			if (client.box.unproxy.has(ctx.this)) {
-				// toString is being called on a proxy of a native function
-				// `this` will then be the proxy, which has the wrong [[SourceText]]
-				// unproxy so it passes through
 				ctx.this = client.box.unproxy.get(ctx.this)!;
-				// since we know it's a native function, no need to unrewrite
+
 				return;
 			}
-			// const before = performance.now();
+
 			doUnrewrite(client, ctx);
-			// dbg.time(client.meta, before, `scramtag unrewrite for ${ctx.fn.name}`);
 		},
 	});
 }

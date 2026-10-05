@@ -1,0 +1,47 @@
+{
+	"name": "@ramjet/transport-assisted",
+	"version": "0.1.0",
+	"type": "module",
+	"description": "Browser half of the Ramjet assisted transport (implements ProxyTransport)",
+	"scripts": {
+		"test": "node --no-warnings --test test/",
+		"build": "esbuild src/index.ts --bundle --minify --format=iife --global-name=RamjetAssisted --target=es2022 --outfile=dist/assisted-transport.js && esbuild src/index.ts --bundle --minify --format=esm --target=es2022 --outfile=dist/assisted-transport.mjs && tsc src/index.ts --declaration --emitDeclarationOnly --allowImportingTsExtensions --skipLibCheck --target es2022 --module esnext --moduleResolution bundler --outDir dist/types",
+		"prepack": "pnpm build"
+	},
+	"license": "AGPL-3.0-only",
+	"devDependencies": {
+		"esbuild": "^0.28.2",
+		"typescript": "^5.9.3"
+	},
+	"main": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts",
+		"./bundle": "./dist/assisted-transport.mjs"
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"publishConfig": {
+		"access": "public",
+		"main": "./dist/assisted-transport.mjs",
+		"module": "./dist/assisted-transport.mjs",
+		"types": "./dist/types/index.d.ts",
+		"exports": {
+			".": {
+				"types": "./dist/types/index.d.ts",
+				"import": "./dist/assisted-transport.mjs",
+				"default": "./dist/assisted-transport.js"
+			}
+		}
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/hackz00/ramjet.git",
+		"directory": "packages/transport-assisted"
+	},
+	"homepage": "https://github.com/hackz00/ramjet#readme",
+	"bugs": {
+		"url": "https://github.com/hackz00/ramjet/issues"
+	}
+}

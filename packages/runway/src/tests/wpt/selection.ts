@@ -22,15 +22,6 @@ export function includeReferrerGeneratedFile(relPath: string) {
 	);
 }
 
-/**
- * Tests in this set assert behaviour that fundamentally requires real
- * transient user activation (clicked anchor, form submit triggered from a
- * gesture, popped window from `window.open`, etc.). The runway harness can
- * only fake activation through CDP-level clicks which Chromium doesn't fully
- * honour for cross-frame nav requests, so these subtest assertions never
- * pass. The whole file is excluded rather than partially skipped, so the
- * `runway-bless` plumbing can stay deleted.
- */
 const FETCH_METADATA_USER_ACTIVATION_GENERATED = new Set<string>([
 	"fetch/metadata/generated/element-a.sub.html",
 	"fetch/metadata/generated/element-a.https.sub.html",
@@ -46,25 +37,12 @@ const FETCH_METADATA_USER_ACTIVATION_GENERATED = new Set<string>([
 	"fetch/metadata/generated/window-location.https.sub.html",
 ]);
 
-/**
- * Worklet-related fetch-metadata tests. Scramjet doesn't currently proxy
- * AudioWorklet / PaintWorklet module loads, so these can never pass; we
- * exclude them rather than vendor dead weight.
- */
 const FETCH_METADATA_WORKLET_FILES = new Set<string>([
 	"fetch/metadata/generated/audioworklet.https.sub.html",
 	"fetch/metadata/audio-worklet.https.html",
 	"fetch/metadata/paint-worklet.https.html",
 ]);
 
-/**
- * Top-level (non-generated) `fetch/metadata/*.https.sub.html` and
- * `*.https.html` tests we vendor alongside the generated suite. These cover
- * scenarios the procedurally-generated tests don't (e.g. the page's own
- * navigation request, preload, style, track, etc.). Files known to require
- * real user activation (notably `window-open.https.sub.html`) and worklet
- * tests (audio/paint worklet — scramjet doesn't proxy worklets) are excluded.
- */
 const FETCH_METADATA_PAGE_FILES = new Set<string>([
 	"fetch/metadata/embed.https.sub.tentative.html",
 	"fetch/metadata/navigation.https.sub.html",
@@ -124,14 +102,14 @@ export const COOKIE_WPT_FILES = [
 	"cookies/resources/testharness-helpers.js",
 	"cookies/value/value-ctl.html",
 	"cookies/value/value.html",
-	// Prefix tests — HTTPS variants only (non-HTTPS variants test rejection on HTTP, which we skip)
+
 	"cookies/prefix/__host.document-cookie.https.html",
 	"cookies/prefix/__host.header.https.html",
 	"cookies/prefix/__secure.document-cookie.https.html",
 	"cookies/prefix/__secure.header.https.html",
-	// Size tests
+
 	"cookies/size/name-and-value.html",
-	// SameSite test pages (all .https.html — run over HTTP since Scramjet treats all as HTTPS)
+
 	"cookies/samesite/fetch.https.html",
 	"cookies/samesite/iframe.https.html",
 	"cookies/samesite/iframe.document.https.html",
@@ -151,7 +129,7 @@ export const COOKIE_WPT_FILES = [
 	"cookies/samesite/setcookie-lax.https.html",
 	"cookies/samesite/setcookie-navigation.https.html",
 	"cookies/samesite/multiple-samesite-attributes.https.html",
-	// SameSite resources (loaded by the test pages above, not run directly)
+
 	"cookies/samesite/resources/puppet.html",
 	"cookies/samesite/resources/echo-cookies.html",
 	"cookies/samesite/resources/navigate.html",
@@ -167,11 +145,11 @@ export const COOKIE_WPT_PAGES = COOKIE_WPT_FILES.filter(
 	(file) =>
 		file.endsWith(".html") &&
 		!file.includes("/resources/") &&
-		!file.endsWith(".headers")
+		!file.endsWith(".headers"),
 );
 
 export function includeCookieFile(relPath: string) {
 	return COOKIE_WPT_FILE_SET.has(
-		normalize(relPath) as (typeof COOKIE_WPT_FILES)[number]
+		normalize(relPath) as (typeof COOKIE_WPT_FILES)[number],
 	);
 }

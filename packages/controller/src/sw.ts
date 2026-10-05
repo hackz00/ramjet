@@ -1,8 +1,9 @@
 /// <reference lib="WebWorker" />
 /// <reference types="@types/serviceworker" />
-import { RpcHelper } from "@mercuryworkshop/rpc";
+import { RpcHelper } from "@ramjet/rpc";
 import type { Controllerbound, SWbound } from "./types";
 import type { RawHeaders } from "@mercuryworkshop/proxy-transports";
+import { lookupOutputCache } from "./output-cache";
 
 function makeId(): string {
 	return Math.random().toString(36).substring(2, 10);
@@ -29,7 +30,7 @@ addEventListener("message", (e) => {
 		const { port, prefix } = e.data.$sw$initRemoteTransport;
 
 		const relevantcontroller = tabs.find((tab) =>
-			new URL(prefix).pathname.startsWith(tab.prefix)
+			new URL(prefix).pathname.startsWith(tab.prefix),
 		);
 		if (!relevantcontroller) {
 			console.error("No relevant controller found for transport init");
@@ -45,19 +46,19 @@ class ControllerReference {
 	constructor(
 		public prefix: string,
 		public id: string,
-		port: MessagePort
+		public generation: string,
+		port: MessagePort,
 	) {
 		this.rpc = new RpcHelper(
 			{
+				setOutputCacheGeneration: async ({ generation }) => {
+					this.generation = generation;
+				},
 				sendSetCookie: async ({ cookies, options }) => {
 					const clients = await self.clients.matchAll();
 					const ids: string[] = [];
 					const promises: Promise<string>[] = [];
 
-					// Navigation fetches (document/iframe) deliver cookies via the inject
-					// script's embedded cookieJar dump — the destination page doesn't have
-					// inject.ts loaded yet to ack, so awaiting would deadlock. Broadcast
-					// so any already-loaded clients can update their jars, but don't wait.
 					const isNavigation =
 						options?.destination === "document" ||
 						options?.destination === "iframe";
@@ -75,16 +76,12 @@ class ControllerReference {
 						if (!isNavigation) {
 							promises.push(
 								new Promise<string>((resolve) => {
-									// Resolve with the id so we know which client replied.
 									cookieResolvers[id] = () => resolve(id);
-								})
+								}),
 							);
 						}
 					}
-					// Wait for the first client to acknowledge the cookie sync.
-					// Using Promise.any (not Promise.all) so that extra SW clients created by
-					// window.open (e.g. test popup windows) don't cause timeouts — only the
-					// main controller client needs to respond.
+
 					if (promises.length > 0) {
 						let timeoutId: ReturnType<typeof setTimeout> | undefined;
 						let responded = false;
@@ -92,13 +89,13 @@ class ControllerReference {
 							timeoutId = setTimeout(() => {
 								if (!responded) {
 									const pending = ids.filter(
-										(id) => cookieResolvers[id] !== undefined
+										(id) => cookieResolvers[id] !== undefined,
 									);
 									console.error(
 										"timed out waiting for set cookie response (deadlock?): " +
 											`cookies=${cookies.length} clients=${clients.length} ` +
 											`pending=${pending.length}/${ids.length} ` +
-											`clientUrls=${clients.map((c) => c.url).join(",")}`
+											`clientUrls=${clients.map((c) => c.url).join(",")}`,
 									);
 								}
 								resolve();
@@ -115,11 +112,8 @@ class ControllerReference {
 									.catch(() => {}),
 							]);
 						} finally {
-							// Clear the timeout so it doesn't fire spuriously after the
-							// race has already been won by Promise.any.
 							if (timeoutId !== undefined) clearTimeout(timeoutId);
-							// Clean up any pending resolvers so clients that never
-							// responded don't leak entries in cookieResolvers.
+
 							for (const id of ids) {
 								delete cookieResolvers[id];
 							}
@@ -130,7 +124,7 @@ class ControllerReference {
 			"tabchannel-" + id,
 			(data, transfer) => {
 				port.postMessage(data, transfer);
-			}
+			},
 		);
 		port.onmessage = (e: MessageEvent) => {
 			this.rpc.recieve(e.data);
@@ -154,7 +148,14 @@ addEventListener("message", (e) => {
 	if (existing !== -1) {
 		tabs.splice(existing, 1);
 	}
-	tabs.push(new ControllerReference(init.prefix, init.id, e.ports[0]));
+	tabs.push(
+		new ControllerReference(
+			init.prefix,
+			init.id,
+			init.generation ?? "",
+			e.ports[0],
+		),
+	);
 });
 
 export function shouldRoute(event: FetchEvent): boolean {
@@ -167,6 +168,24 @@ export async function route(event: FetchEvent): Promise<Response> {
 	try {
 		const url = new URL(event.request.url);
 		const tab = tabs.find((tab) => url.pathname.startsWith(tab.prefix))!;
+
+		const cached = tab.generation
+			? await lookupOutputCache(
+					caches,
+					{
+						url: event.request.url,
+						method: event.request.method,
+						mode: event.request.mode,
+						destination: event.request.destination,
+						cacheMode: event.request.cache,
+						hasRange: event.request.headers.has("range"),
+						hasAuthorization: event.request.headers.has("authorization"),
+					},
+					{ controllerPrefix: tab.prefix, generation: tab.generation },
+				).catch(() => null)
+			: null;
+		if (cached) return cached;
+
 		const client = await clients.get(event.clientId);
 
 		const rawheaders: RawHeaders = [...event.request.headers];
@@ -191,7 +210,7 @@ export async function route(event: FetchEvent): Promise<Response> {
 				// @ts-expect-error the types for fetchevent are messed up
 				event.request.body instanceof ArrayBuffer
 				? [event.request.body]
-				: undefined
+				: undefined,
 		);
 
 		return new Response(response.body, {
@@ -205,7 +224,7 @@ export async function route(event: FetchEvent): Promise<Response> {
 			"Internal Service Worker Error: " + (e as Error).message,
 			{
 				status: 500,
-			}
+			},
 		);
 	}
 }
@@ -218,8 +237,6 @@ addEventListener("activate", (event: ExtendableEvent) => {
 	event.waitUntil(clients.claim());
 });
 
-// the only way to know if a service worker has suddenly died is if this code runs again
-// notify all clients to send over their messageports again
 setTimeout(async () => {
 	console.log("service worker activated, notifying clients to revive");
 	for (const client of await clients.matchAll()) {
@@ -227,5 +244,4 @@ setTimeout(async () => {
 			$controller$swrevive: {},
 		});
 	}
-	// short delay is apparently needed
 }, 100);

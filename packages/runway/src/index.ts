@@ -1,6 +1,6 @@
 import { glob, mkdir, writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import { chromium } from "playwright";
 import type { Page, Browser, BrowserContext } from "playwright";
@@ -16,10 +16,8 @@ import { setupRunwayPageBindings } from "./cdp-page.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Check if running in GitHub Actions
 const isGitHubActions = process.env.GITHUB_ACTIONS === "true";
 
-// GitHub Actions annotation helpers
 function ghaError(message: string, file?: string, line?: number) {
 	if (!isGitHubActions) return;
 	const params = [file && `file=${file}`, line && `line=${line}`]
@@ -54,11 +52,11 @@ type ExpectedFailingTestsFile = {
 	tests: string[];
 };
 
-type HarnessKind = "scramjet" | "bare";
+type HarnessKind = "ramjet" | "bare";
 
 type ConsistencyIssue = {
 	label: string;
-	scramjet?: any;
+	ramjet?: any;
 	bare?: any;
 	reason: string;
 };
@@ -99,18 +97,14 @@ function createConsistencyTracker(requireBoth: boolean) {
 		const entry = getEntry(safeLabel);
 		entry.values[source] = value;
 
-		if (
-			!entry.settled &&
-			"scramjet" in entry.values &&
-			"bare" in entry.values
-		) {
-			const scramjetValue = entry.values.scramjet;
+		if (!entry.settled && "ramjet" in entry.values && "bare" in entry.values) {
+			const ramjetValue = entry.values.ramjet;
 			const bareValue = entry.values.bare;
-			if (!isDeepStrictEqual(scramjetValue, bareValue)) {
+			if (!isDeepStrictEqual(ramjetValue, bareValue)) {
 				entry.settled = true;
 				issues.push({
 					label: safeLabel,
-					scramjet: scramjetValue,
+					ramjet: ramjetValue,
 					bare: bareValue,
 					reason: "Values differ",
 				});
@@ -139,16 +133,14 @@ function createConsistencyTracker(requireBoth: boolean) {
 					}, timeout);
 				}),
 			]);
-		} catch {
-			// handled below
-		}
+		} catch {}
 
 		if (timedOut) {
 			for (const [label, entry] of entries) {
 				if (!entry.settled) {
 					issues.push({
 						label,
-						scramjet: entry.values.scramjet,
+						ramjet: entry.values.ramjet,
 						bare: entry.values.bare,
 						reason: "Timed out waiting for both values",
 					});
@@ -184,9 +176,8 @@ async function discoverTests(): Promise<Test[]> {
 			continue;
 		}
 		const fullPath = path.join(__dirname, "tests", file);
-		const module = await import(fullPath);
+		const module = await import(pathToFileURL(fullPath).href);
 		if (module.default) {
-			// Handle both single test and array of tests
 			if (Array.isArray(module.default)) {
 				tests.push(...module.default);
 			} else {
@@ -198,7 +189,7 @@ async function discoverTests(): Promise<Test[]> {
 }
 
 async function loadExpectedFailingTests(
-	filePath: string
+	filePath: string,
 ): Promise<Set<string>> {
 	try {
 		const raw = await readFile(filePath, "utf-8");
@@ -219,7 +210,7 @@ async function loadExpectedFailingTests(
 
 async function writeExpectedFailingTests(
 	filePath: string,
-	tests: string[]
+	tests: string[],
 ): Promise<void> {
 	const payload: ExpectedFailingTestsFile = {
 		tests: [...tests].sort(),
@@ -234,11 +225,11 @@ async function createTestPage(
 		onConsistent?: (
 			source: HarnessKind,
 			label: string,
-			value: any
+			value: any,
 		) => Promise<void>;
 		collectCoverage?: boolean;
 		installBindings?: boolean;
-	}
+	},
 ): Promise<{
 	page: Page;
 	context: BrowserContext;
@@ -264,8 +255,7 @@ async function createTestPage(
 	let resultPromise: Promise<TestResult>;
 	let okCount = 0;
 	let expectedRunwayToken: string | undefined;
-	// Whether a test currently owns this page. Uncaught errors are only charged
-	// to a test while it's armed; see the `pageerror` handler below.
+
 	let armed = false;
 
 	const resetPromise = () => {
@@ -328,9 +318,6 @@ async function createTestPage(
 
 	if (options.installBindings !== false) {
 		page.on("pageerror", (error) => {
-			// `pageerror` carries no frame attribution, so an error can only be
-			// blamed on a test that currently owns the page. Anything raised
-			// between tests belongs to a document we've already torn down.
 			if (!armed) return;
 			settle({
 				status: "fail",
@@ -388,18 +375,6 @@ async function createTestPage(
 	};
 }
 
-/**
- * Blank the harness test iframe, destroying whatever document the previous
- * test left behind.
- *
- * Tearing a document down can raise late, asynchronous errors that have
- * nothing to do with the next test — a real site with an in-flight view
- * transition rejects it with "Transition was skipped" on unload, for
- * instance. Playwright reports those through `pageerror`, which carries no
- * frame attribution, so whichever test happened to be armed at that moment
- * got blamed. Unloading here means the teardown lands while the page is
- * unarmed and the errors are dropped.
- */
 async function resetTestFrame(page: Page) {
 	if (page.isClosed()) return;
 	await page
@@ -407,9 +382,9 @@ async function resetTestFrame(page: Page) {
 			() =>
 				new Promise<void>((resolve) => {
 					const iframe = document.getElementById(
-						"testframe"
+						"testframe",
 					) as HTMLIFrameElement | null;
-					// No previous document to tear down.
+
 					if (!iframe || iframe.getAttribute("src") === "about:blank") {
 						resolve();
 						return;
@@ -418,16 +393,14 @@ async function resetTestFrame(page: Page) {
 					const finish = () => {
 						if (settled) return;
 						settled = true;
-						// Yield a task so that an unhandled rejection queued by the
-						// outgoing document is reported before we hand the page to
-						// the next test.
+
 						setTimeout(resolve, 0);
 					};
 					iframe.addEventListener("load", finish, { once: true });
-					// Never let a frame that won't fire `load` stall the run.
+
 					setTimeout(finish, 2000);
 					iframe.src = "about:blank";
-				})
+				}),
 		)
 		.catch(() => {});
 }
@@ -443,7 +416,7 @@ async function syncRunwayCleartextHarness(page: Page, test: Test) {
 			(window as any).__runwayCleartextHttpsHosts = payload.hosts;
 			(window as any).__runwayCleartextSite = payload.site;
 		},
-		{ hosts, site }
+		{ hosts, site },
 	);
 }
 
@@ -456,10 +429,8 @@ async function runTestOnHarness(
 	watchPage: (otherPage: Page) => () => void,
 	test: Test,
 	serverResult: Promise<TestResult> | null,
-	timeout: number = 30000
+	timeout: number = 30000,
 ): Promise<TestResult> {
-	// Must happen before this test arms the page, so that anything the previous
-	// document emits on the way out isn't charged to this test.
 	await resetTestFrame(page);
 	await syncRunwayCleartextHarness(page, test);
 
@@ -494,11 +465,10 @@ async function runTestOnHarness(
 					clearTimeout(timeoutId);
 				}
 			},
-			{ url: proxiedUrl, timeout: Math.min(timeout, 5000) }
+			{ url: proxiedUrl, timeout: Math.min(timeout, 5000) },
 		);
 	};
 
-	// Handle playwright tests (tests that control the browser directly)
 	if (test.playwrightFn) {
 		const frame = page.frameLocator("#testframe");
 		const navigate = async (url: string) => {
@@ -520,29 +490,29 @@ async function runTestOnHarness(
 	}
 
 	const runwayToken = crypto.randomUUID();
-	const testUrl = test.topLevelScramjet
+	const testUrl = test.topLevelRamjet
 		? runwayTestTargetUrl(test)
 		: appendRunwayToken(
 				runwayTestTargetUrl(test),
 				runwayToken,
-				test.name.startsWith("wpt-")
+				test.name.startsWith("wpt-"),
 			);
 	const harnessResultPromise = waitForResult(
 		timeout,
-		test.topLevelScramjet ? undefined : runwayToken
+		test.topLevelRamjet ? undefined : runwayToken,
 	);
 	let result: TestResult;
 	let topLevelPage: Page | null = null;
 	let stopWatchingTopLevelPage: (() => void) | null = null;
 	let topLevelNavigationPromise: Promise<void> | null = null;
-	if (test.topLevelScramjet) {
+	if (test.topLevelRamjet) {
 		const proxiedUrl = await page.evaluate((url) => {
 			if (typeof (window as any).__runwayGetProxiedUrl === "function") {
 				return (window as any).__runwayGetProxiedUrl(url);
 			}
 			(window as any).__runwayNavigate(url);
 			const iframe = document.getElementById(
-				"testframe"
+				"testframe",
 			) as HTMLIFrameElement | null;
 			return iframe?.src || "";
 		}, testUrl);
@@ -567,7 +537,7 @@ async function runTestOnHarness(
 					clearTimeout(timeoutId);
 				}
 			},
-			{ url: proxiedUrl, timeout: Math.min(timeout, 5000) }
+			{ url: proxiedUrl, timeout: Math.min(timeout, 5000) },
 		);
 		topLevelPage = await context.newPage();
 		stopWatchingTopLevelPage = watchPage(topLevelPage);
@@ -579,7 +549,6 @@ async function runTestOnHarness(
 			await warmProxiedUrl(testUrl);
 		}
 		await page.evaluate((url) => {
-			// This function should be defined by the harness
 			(window as any).__runwayNavigate(url);
 		}, testUrl);
 	}
@@ -594,10 +563,7 @@ async function runTestOnHarness(
 			...(topLevelNavigationPromise
 				? [
 						topLevelNavigationPromise.then(
-							() =>
-								new Promise<never>(() => {
-									// keep the race pending; completion is driven by pass/fail
-								}),
+							() => new Promise<never>(() => {}),
 							(error) => ({
 								source: "navigation" as const,
 								value: {
@@ -605,7 +571,7 @@ async function runTestOnHarness(
 									message:
 										error instanceof Error ? error.message : String(error),
 								},
-							})
+							}),
 						),
 					]
 				: []),
@@ -619,14 +585,11 @@ async function runTestOnHarness(
 			const raced = await Promise.race([
 				harnessResultPromise,
 				topLevelNavigationPromise.then(
-					() =>
-						new Promise<never>(() => {
-							// keep pending; pass/fail will resolve separately
-						}),
+					() => new Promise<never>(() => {}),
 					(error) => ({
 						status: "fail" as const,
 						message: error instanceof Error ? error.message : String(error),
-					})
+					}),
 				),
 			]);
 			result = raced;
@@ -641,7 +604,6 @@ async function runTestOnHarness(
 		await topLevelPage.close().catch(() => {});
 	}
 
-	// Validate okCount if expectedOkCount is set
 	if (result.status === "pass" && test.expectedOkCount !== undefined) {
 		const actualOkCount = getOkCount();
 		if (actualOkCount !== test.expectedOkCount) {
@@ -663,14 +625,13 @@ function appendRunwayToken(url: string, token: string, useQuery: boolean) {
 		return parsed.toString();
 	}
 	const hashParams = new URLSearchParams(
-		parsed.hash.startsWith("#") ? parsed.hash.slice(1) : parsed.hash
+		parsed.hash.startsWith("#") ? parsed.hash.slice(1) : parsed.hash,
 	);
 	hashParams.set("runway_token", token);
 	parsed.hash = hashParams.toString();
 	return parsed.toString();
 }
 
-// Main runner
 async function main() {
 	console.log("🚀 Starting Runway test runner\n");
 
@@ -698,13 +659,12 @@ async function main() {
 
 	const allTests = await discoverTests();
 
-	// Filter tests if a pattern is provided
 	const tests = testFilter
 		? allTests.filter((t) => t.name.includes(testFilter!))
 		: allTests;
 	const parallelism = Math.max(
 		1,
-		Number(process.env.RUNWAY_PARALLEL ?? parallelArg ?? 1)
+		Number(process.env.RUNWAY_PARALLEL ?? parallelArg ?? 1),
 	);
 	const fastMode = process.env.RUNWAY_FAST === "1";
 	const omitWpt = process.env.OMIT_WPT === "1";
@@ -716,14 +676,14 @@ async function main() {
 		console.log(`� Filter: "${testFilter}"`);
 	}
 	console.log(
-		`�📋 Found ${tests.length} test(s)${testFilter ? ` (${allTests.length} total)` : ""}\n`
+		`�📋 Found ${tests.length} test(s)${testFilter ? ` (${allTests.length} total)` : ""}\n`,
 	);
 	if (parallelism > 1) {
 		console.log(`🧵 Parallel workers: ${parallelism}\n`);
 	}
 	if (fastMode) {
 		console.log(
-			"⚡ Fast mode: reusing one scramjet harness instance per worker and skipping bare tests\n"
+			"⚡ Fast mode: reusing one ramjet harness instance per worker and skipping bare tests\n",
 		);
 	}
 	if (updateFailingTests) {
@@ -735,25 +695,24 @@ async function main() {
 
 	if (tests.length === 0) {
 		console.log(
-			`❌ No tests found${testFilter ? ` matching "${testFilter}"` : ""}`
+			`❌ No tests found${testFilter ? ` matching "${testFilter}"` : ""}`,
 		);
 		process.exit(1);
 	}
 
 	const needsHarness = tests.some((test) => !test.directFn);
 	const needsBareHarness =
-		runBareTests && tests.some((test) => !test.directFn && !test.scramjetOnly);
-	let scramjetUrl = "";
+		runBareTests && tests.some((test) => !test.directFn && !test.ramjetOnly);
+	let ramjetUrl = "";
 	let bareUrl = "";
 	let browser: Browser | null = null;
 	if (needsHarness) {
-		// Start the harness servers
 		const { startHarness, PORT: HARNESS_PORT } = await import(
-			"./harness/scramjet/index.ts"
+			"./harness/ramjet/index.ts"
 		);
 		await startHarness();
-		scramjetUrl = `http://localhost:${HARNESS_PORT}`;
-		console.log(`📡 Scramjet harness running at ${scramjetUrl}`);
+		ramjetUrl = `http://localhost:${HARNESS_PORT}`;
+		console.log(`📡 Ramjet harness running at ${ramjetUrl}`);
 		if (needsBareHarness) {
 			const { startBareHarness, BARE_PORT } = await import(
 				"./harness/bare/index.ts"
@@ -771,7 +730,7 @@ async function main() {
 		console.log("🧪 Direct tests only: skipping harness/browser startup\n");
 	}
 
-	const coverageEnabled = process.env.SCRAMJET_COVERAGE === "1";
+	const coverageEnabled = process.env.RAMJET_COVERAGE === "1";
 	const coverageEntries: Array<{
 		url: string;
 		functions: any;
@@ -782,9 +741,7 @@ async function main() {
 		try {
 			const entries = await page.coverage.stopJSCoverage();
 			coverageEntries.push(...entries);
-		} catch {
-			// ignore
-		}
+		} catch {}
 	};
 
 	const results: TestRunResult[] = [];
@@ -794,7 +751,7 @@ async function main() {
 		try {
 			await page.waitForFunction(
 				() => typeof (window as any).__runwayNavigate === "function",
-				{ timeout: 30000 }
+				{ timeout: 30000 },
 			);
 		} catch {
 			const statusText = await page.evaluate(() => {
@@ -802,10 +759,10 @@ async function main() {
 				return el?.textContent || "";
 			});
 			console.error(
-				`\n💥 FATAL: ${label} harness failed to initialize: ${statusText}`
+				`\n💥 FATAL: ${label} harness failed to initialize: ${statusText}`,
 			);
 			console.error(
-				"   Check that scramjet is built and all dependencies are available.\n"
+				"   Check that ramjet is built and all dependencies are available.\n",
 			);
 			ghaError(`Harness failed to initialize: ${label}: ${statusText}`);
 			await browser?.close();
@@ -817,22 +774,22 @@ async function main() {
 		let consistencyHandler: (
 			source: HarnessKind,
 			label: string,
-			value: any
+			value: any,
 		) => Promise<void> = async () => {};
 		const workerNeedsBare =
 			runBareTests &&
-			workerTests.some((test) => !test.directFn && !test.scramjetOnly);
-		const createPages = async (installScramjetBindings: boolean) => {
+			workerTests.some((test) => !test.directFn && !test.ramjetOnly);
+		const createPages = async (installRamjetBindings: boolean) => {
 			if (!browser) {
 				throw new Error("Browser is unavailable for harness-based tests");
 			}
 			return {
-				scramjet: await createTestPage(browser, {
-					name: "scramjet",
+				ramjet: await createTestPage(browser, {
+					name: "ramjet",
 					onConsistent: (source, label, value) =>
 						consistencyHandler(source, label, value),
 					collectCoverage: coverageEnabled,
-					installBindings: installScramjetBindings,
+					installBindings: installRamjetBindings,
 				}),
 				bare: workerNeedsBare
 					? await createTestPage(browser, {
@@ -843,12 +800,12 @@ async function main() {
 					: null,
 			};
 		};
-		let scramjetBindingsInstalled = true;
+		let ramjetBindingsInstalled = true;
 		let testPages: Awaited<ReturnType<typeof createPages>> | null = null;
 		let needsReload = true;
 
 		for (const test of workerTests) {
-			const runBareForTest = runBareTests && !test.scramjetOnly;
+			const runBareForTest = runBareTests && !test.ramjetOnly;
 			const consistencyTracker = createConsistencyTracker(runBareForTest);
 			consistencyHandler = consistencyTracker.handle;
 			if (!test.directFn && !fastMode && test.reloadHarness) {
@@ -864,30 +821,27 @@ async function main() {
 					await test.directFn();
 					result = { status: "pass" };
 				} else {
-					// Reload pages if needed (first run or after failure)
-					const desiredScramjetBindings = fastMode
-						? true
-						: !test.topLevelScramjet;
+					const desiredRamjetBindings = fastMode ? true : !test.topLevelRamjet;
 					if (
 						!testPages ||
 						needsReload ||
-						desiredScramjetBindings !== scramjetBindingsInstalled
+						desiredRamjetBindings !== ramjetBindingsInstalled
 					) {
 						if (testPages) {
-							if (!testPages.scramjet.page.isClosed()) {
-								await flushCoverage(testPages.scramjet.page);
+							if (!testPages.ramjet.page.isClosed()) {
+								await flushCoverage(testPages.ramjet.page);
 							}
 							await Promise.all([
-								testPages.scramjet.cleanup(),
+								testPages.ramjet.cleanup(),
 								testPages.bare?.cleanup(),
 							]);
 						}
-						scramjetBindingsInstalled = desiredScramjetBindings;
-						testPages = await createPages(scramjetBindingsInstalled);
+						ramjetBindingsInstalled = desiredRamjetBindings;
+						testPages = await createPages(ramjetBindingsInstalled);
 						await ensureHarnessReady(
-							testPages.scramjet.page,
-							scramjetUrl,
-							"Scramjet"
+							testPages.ramjet.page,
+							ramjetUrl,
+							"Ramjet",
 						);
 						if (testPages.bare) {
 							await ensureHarnessReady(testPages.bare.page, bareUrl, "Bare");
@@ -911,16 +865,16 @@ async function main() {
 						started = true;
 					}
 
-					const scramjetPromise = runTestOnHarness(
-						testPages.scramjet.page,
-						testPages.scramjet.context,
-						testPages.scramjet.waitForResult,
-						testPages.scramjet.cancelWaitForResult,
-						testPages.scramjet.getOkCount,
-						testPages.scramjet.watchPage,
+					const ramjetPromise = runTestOnHarness(
+						testPages.ramjet.page,
+						testPages.ramjet.context,
+						testPages.ramjet.waitForResult,
+						testPages.ramjet.cancelWaitForResult,
+						testPages.ramjet.getOkCount,
+						testPages.ramjet.watchPage,
 						test,
 						serverResult,
-						test.timeoutMs
+						test.timeoutMs,
 					);
 					const barePromise = runBareForTest
 						? runTestOnHarness(
@@ -932,38 +886,38 @@ async function main() {
 								testPages.bare!.watchPage,
 								test,
 								serverResult,
-								test.timeoutMs
+								test.timeoutMs,
 							)
 						: null;
 
-					const [scramjetResult, bareResult] = runBareForTest
-						? await Promise.all([scramjetPromise, barePromise!])
-						: [await scramjetPromise, null];
+					const [ramjetResult, bareResult] = runBareForTest
+						? await Promise.all([ramjetPromise, barePromise!])
+						: [await ramjetPromise, null];
 
 					const consistencyResult = await consistencyTracker.finalize(30000);
 
 					let computedResult: TestResult;
 					if (!runBareForTest) {
-						computedResult = scramjetResult;
+						computedResult = ramjetResult;
 					} else if (
-						scramjetResult.status !== "pass" ||
+						ramjetResult.status !== "pass" ||
 						bareResult!.status !== "pass"
 					) {
 						const failures: string[] = [];
-						if (scramjetResult.status !== "pass") {
+						if (ramjetResult.status !== "pass") {
 							failures.push(
-								`scramjet: ${scramjetResult.message || scramjetResult.status}`
+								`ramjet: ${ramjetResult.message || ramjetResult.status}`,
 							);
 						}
 						if (bareResult!.status !== "pass") {
 							failures.push(
-								`bare: ${bareResult!.message || bareResult!.status}`
+								`bare: ${bareResult!.message || bareResult!.status}`,
 							);
 						}
 						computedResult = {
 							status: "fail",
 							message: failures.join(" | "),
-							details: { scramjet: scramjetResult, bare: bareResult },
+							details: { ramjet: ramjetResult, bare: bareResult },
 						};
 					} else if (consistencyResult.status === "fail") {
 						computedResult = {
@@ -1016,10 +970,10 @@ async function main() {
 						ghaEndGroup(),
 					]
 						.filter(Boolean)
-						.join("\n")
+						.join("\n"),
 				);
 				if (!test.directFn) {
-					needsReload = !fastMode; // Reload after failure unless fast mode is reusing harnesses
+					needsReload = !fastMode;
 				}
 			} else {
 				console.log(
@@ -1028,24 +982,24 @@ async function main() {
 						finalResult.message ? `     ${finalResult.message}` : null,
 						ghaEndGroup(),
 						ghaError(
-							`Test "${test.name}" error: ${finalResult.message || "Unknown error"}`
+							`Test "${test.name}" error: ${finalResult.message || "Unknown error"}`,
 						),
 					]
 						.filter(Boolean)
-						.join("\n")
+						.join("\n"),
 				);
 				if (!test.directFn) {
-					needsReload = !fastMode; // Reload after error unless fast mode is reusing harnesses
+					needsReload = !fastMode;
 				}
 			}
 		}
 
 		if (testPages) {
 			await Promise.all([
-				testPages.scramjet.cleanup(),
+				testPages.ramjet.cleanup(),
 				testPages.bare?.cleanup(),
 			]);
-			await flushCoverage(testPages.scramjet.page);
+			await flushCoverage(testPages.ramjet.page);
 		}
 	};
 
@@ -1055,16 +1009,16 @@ async function main() {
 		workerBuckets[i % workerCount].push(tests[i]);
 	}
 	await Promise.all(
-		workerBuckets.map((bucket, index) => runTestsForWorker(index + 1, bucket))
+		workerBuckets.map((bucket, index) => runTestsForWorker(index + 1, bucket)),
 	);
 	await browser?.close();
 
 	if (coverageEnabled && needsHarness) {
-		const scramjetEntries = coverageEntries.filter((entry) =>
-			entry.url?.includes("/scramjet/scramjet.js")
+		const ramjetEntries = coverageEntries.filter((entry) =>
+			entry.url?.includes("/ramjet/ramjet.js"),
 		);
-		const scramjetRoot = path.resolve(__dirname, "..", "..", "..");
-		const coreRoot = path.join(scramjetRoot, "packages", "core");
+		const ramjetRoot = path.resolve(__dirname, "..", "..", "..");
+		const coreRoot = path.join(ramjetRoot, "packages", "core");
 		const allowedRoots = [
 			path.join(coreRoot, "src"),
 			path.join(coreRoot, "rewriter", "src"),
@@ -1075,18 +1029,18 @@ async function main() {
 		const { createCoverageMap } = istanbulCoverage as typeof istanbulCoverage;
 		const coverageMap = createCoverageMap({});
 
-		if (scramjetEntries.length > 0) {
-			const scramjetBundlePath = path.join(
+		if (ramjetEntries.length > 0) {
+			const ramjetBundlePath = path.join(
 				__dirname,
 				"..",
 				"node_modules",
 				"@mercuryworkshop",
-				"scramjet",
+				"ramjet",
 				"dist",
-				"scramjet.js"
+				"ramjet.js",
 			);
-			const mapPath = `${scramjetBundlePath}.map`;
-			const bundleSource = await readFile(scramjetBundlePath, "utf-8");
+			const mapPath = `${ramjetBundlePath}.map`;
+			const bundleSource = await readFile(ramjetBundlePath, "utf-8");
 			const rawMap = JSON.parse(await readFile(mapPath, "utf-8"));
 			rawMap.sourceRoot = "";
 			rawMap.sources = rawMap.sources.map((source: string) => {
@@ -1094,12 +1048,12 @@ async function main() {
 					.replace(/^webpack:\/\/\$?[^/]*\//, "")
 					.replace(/^\.?\//, "");
 				if (normalized.startsWith("packages/")) {
-					return path.join(scramjetRoot, normalized);
+					return path.join(ramjetRoot, normalized);
 				}
 				return normalized;
 			});
-			for (const entry of scramjetEntries) {
-				const converter = v8toIstanbul(scramjetBundlePath, 0, {
+			for (const entry of ramjetEntries) {
+				const converter = v8toIstanbul(ramjetBundlePath, 0, {
 					source: bundleSource,
 					originalSource: bundleSource,
 					sourceMap: { sourcemap: rawMap },
@@ -1120,7 +1074,7 @@ async function main() {
 			if (normalizedPosix.includes("node_modules/")) continue;
 			if (!normalizedPosix.includes("packages/core/")) continue;
 			const resolved = normalizedPosix.startsWith("packages/")
-				? path.join(scramjetRoot, normalizedPosix)
+				? path.join(ramjetRoot, normalizedPosix)
 				: filePath;
 			if (allowedRoots.some((root) => resolved.startsWith(root))) {
 				filteredCoverage[resolved] = data;
@@ -1128,19 +1082,19 @@ async function main() {
 		}
 
 		await writeFile(
-			path.join(coverageDir, "scramjet-coverage.json"),
+			path.join(coverageDir, "ramjet-coverage.json"),
 			JSON.stringify(filteredCoverage, null, 2),
-			"utf-8"
+			"utf-8",
 		);
 		const filteredCoverageMap = createCoverageMap(filteredCoverage);
 		const summary = filteredCoverageMap.getCoverageSummary();
 		const formatSummary = (item: typeof summary.lines) =>
 			`${item.pct.toFixed(1)}% (${item.covered}/${item.total})`;
 		console.log(
-			`\n📊 Scramjet TS coverage written to coverage/scramjet-coverage.json (${Object.keys(filteredCoverage).length} files)`
+			`\n📊 Ramjet TS coverage written to coverage/ramjet-coverage.json (${Object.keys(filteredCoverage).length} files)`,
 		);
 		console.log(
-			`📈 Coverage summary: lines ${formatSummary(summary.lines)}, statements ${formatSummary(summary.statements)}, functions ${formatSummary(summary.functions)}, branches ${formatSummary(summary.branches)}`
+			`📈 Coverage summary: lines ${formatSummary(summary.lines)}, statements ${formatSummary(summary.statements)}, functions ${formatSummary(summary.functions)}, branches ${formatSummary(summary.branches)}`,
 		);
 
 		const uncoveredFunctions: Array<{
@@ -1176,27 +1130,26 @@ async function main() {
 		}
 
 		await writeFile(
-			path.join(coverageDir, "scramjet-uncovered-functions.json"),
+			path.join(coverageDir, "ramjet-uncovered-functions.json"),
 			JSON.stringify(uncoveredFunctions, null, 2),
-			"utf-8"
+			"utf-8",
 		);
 		console.log(
-			`🧭 Uncovered functions written to coverage/scramjet-uncovered-functions.json (${uncoveredFunctions.length} entries)`
+			`🧭 Uncovered functions written to coverage/ramjet-uncovered-functions.json (${uncoveredFunctions.length} entries)`,
 		);
 	} else if (coverageEnabled) {
 		console.log(
-			"📊 Coverage requested, but no harness/browser tests ran. Skipping coverage output."
+			"📊 Coverage requested, but no harness/browser tests ran. Skipping coverage output.",
 		);
 	}
 
-	// Summary
 	console.log("\n" + "─".repeat(50));
 	const passed = results.filter((r) => r.result.status === "pass").length;
 	const failed = results.filter((r) => r.result.status === "fail").length;
 	const errors = results.filter((r) => r.result.status === "error").length;
 
 	console.log(
-		`\n✅ ${passed} passed | ❌ ${failed} failed | 💥 ${errors} errors\n`
+		`\n✅ ${passed} passed | ❌ ${failed} failed | 💥 ${errors} errors\n`,
 	);
 	const selectedTestNames = new Set(tests.map((test) => test.name));
 	const actualFailing = results
@@ -1207,17 +1160,17 @@ async function main() {
 	if (updateFailingTests) {
 		await writeExpectedFailingTests(failingTestsPath, actualFailing);
 		console.log(
-			`📝 Wrote ${actualFailing.length} failing test(s) to ${path.relative(process.cwd(), failingTestsPath)}`
+			`📝 Wrote ${actualFailing.length} failing test(s) to ${path.relative(process.cwd(), failingTestsPath)}`,
 		);
 		process.exit(0);
 	}
 
 	const allExpectedFailing = await loadExpectedFailingTests(failingTestsPath);
 	const expectedFailing = new Set(
-		[...allExpectedFailing].filter((name) => selectedTestNames.has(name))
+		[...allExpectedFailing].filter((name) => selectedTestNames.has(name)),
 	);
 	const unexpectedFailing = actualFailing.filter(
-		(name) => !expectedFailing.has(name)
+		(name) => !expectedFailing.has(name),
 	);
 	const noLongerFailing = [...expectedFailing]
 		.filter((name) => !actualFailing.includes(name))
@@ -1225,7 +1178,7 @@ async function main() {
 
 	console.log("Expected failing diff:");
 	console.log(
-		`  expected=${expectedFailing.size} actual=${actualFailing.length} unexpected=${unexpectedFailing.length} fixed=${noLongerFailing.length}`
+		`  expected=${expectedFailing.size} actual=${actualFailing.length} unexpected=${unexpectedFailing.length} fixed=${noLongerFailing.length}`,
 	);
 	if (unexpectedFailing.length > 0) {
 		console.log("  unexpected failures:");

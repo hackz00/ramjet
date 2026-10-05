@@ -1,32 +1,25 @@
-/// <reference types="@rspack/core/module" />
+import { RAMJETCLIENT } from "./symbols";
 
 declare global {
 	interface Window {
 		WASM: string;
 		REAL_WASM: Uint8Array;
-
-		/**
-		 * The scramjet client belonging to a window.
-		 */
-		[import("./symbols").SCRAMJETCLIENT]: import("./client").ScramjetClient;
+		[RAMJETCLIENT]: import("./client").RamjetClient;
 	}
-
 	interface Document {
-		/**
-		 * Should be the same as window.
-		 */
-		[import("./symbols").SCRAMJETCLIENT]: import("./client").ScramjetClient;
+		[RAMJETCLIENT]: import("./client").RamjetClient;
 	}
+	const dbg: {
+		log: (message: string, ...args: any[]) => void;
+		warn: (message: string, ...args: any[]) => void;
+		error: (message: string, ...args: any[]) => void;
+		debug: (message: string, ...args: any[]) => void;
+		time: (
+			meta: import("./shared/rewriters/url").URLMeta,
+			before: number,
+			type: string,
+		) => void;
+	};
+	type GlobalThis = typeof globalThis;
+	type Self = Window & GlobalThis;
 }
-
-declare const dbg: {
-	log: (message: string, ...args: any[]) => void;
-	warn: (message: string, ...args: any[]) => void;
-	error: (message: string, ...args: any[]) => void;
-	debug: (message: string, ...args: any[]) => void;
-	time: (meta: URLMeta, before: number, type: string) => void;
-};
-
-// eslint-disable-next-line scramjet-core/no-globals
-declare type GlobalThis = typeof globalThis;
-declare type Self = Window & GlobalThis;

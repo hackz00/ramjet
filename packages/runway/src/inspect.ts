@@ -7,7 +7,7 @@ import {
 } from "./testcommon.ts";
 import { glob } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { setupRunwayPageBindings } from "./cdp-page.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -20,7 +20,7 @@ async function discoverTests(): Promise<Test[]> {
 	const tests: Test[] = [];
 	for await (const file of testFiles) {
 		const fullPath = path.join(__dirname, "tests", file);
-		const module = await import(fullPath);
+		const module = await import(pathToFileURL(fullPath).href);
 		if (module.default) {
 			if (Array.isArray(module.default)) {
 				tests.push(...module.default);
@@ -47,7 +47,6 @@ async function main() {
 
 	console.log(`🔍 Inspecting tests matching: ${testFilter}\n`);
 
-	// Discover and filter tests
 	const allTests = await discoverTests();
 	const tests = allTests.filter((t) => t.name.includes(testFilter));
 
@@ -71,7 +70,6 @@ async function main() {
 	}
 	console.log();
 
-	// Start all matching tests (only basicTests need servers)
 	for (const test of tests) {
 		if (!test.playwrightFn && !test.directFn) {
 			await test.start({
@@ -85,7 +83,7 @@ async function main() {
 				},
 			});
 			console.log(
-				`🌐 Test "${test.name}" running at ${runwayTestTargetUrl(test)}`
+				`🌐 Test "${test.name}" running at ${runwayTestTargetUrl(test)}`,
 			);
 		}
 	}
@@ -100,22 +98,20 @@ async function main() {
 				console.log("✅ passed");
 			} catch (error) {
 				console.log(
-					`❌ failed: ${error instanceof Error ? error.message : String(error)}`
+					`❌ failed: ${error instanceof Error ? error.message : String(error)}`,
 				);
 			}
 		}
 		process.exit(0);
 	}
 
-	// Start the harness server
 	const { startHarness, PORT: HARNESS_PORT } = await import(
-		"./harness/scramjet/index.ts"
+		"./harness/ramjet/index.ts"
 	);
 	await startHarness();
 	const harnessUrl = `http://localhost:${HARNESS_PORT}`;
 	console.log(`\n📡 Harness running at ${harnessUrl}`);
 
-	// Launch browser
 	const browser = await chromium.launch({
 		headless: false,
 		devtools: true,
@@ -153,14 +149,12 @@ async function main() {
 		console.log(`${prefix} [console.${type}] ${msg.text()}`);
 	});
 
-	// Navigate to harness
 	await page.goto(harnessUrl);
 
-	// Wait for harness to be ready
 	try {
 		await page.waitForFunction(
 			() => typeof (window as any).__runwayNavigate === "function",
-			{ timeout: 30000 }
+			{ timeout: 30000 },
 		);
 		console.log("✅ Harness ready\n");
 	} catch (e) {
@@ -169,12 +163,11 @@ async function main() {
 		process.exit(1);
 	}
 
-	// Navigate to first test
 	const firstTest = browserTests[0];
 
 	if (firstTest.playwrightFn) {
 		console.log(
-			`🎭 Playwright test "${firstTest.name}" - use navigate() in your test`
+			`🎭 Playwright test "${firstTest.name}" - use navigate() in your test`,
 		);
 		console.log("   Running playwright test function...\n");
 
@@ -191,7 +184,7 @@ async function main() {
 			console.log("\n✅ Playwright test completed successfully");
 		} catch (error) {
 			console.log(
-				`\n❌ Playwright test failed: ${error instanceof Error ? error.message : error}`
+				`\n❌ Playwright test failed: ${error instanceof Error ? error.message : error}`,
 			);
 		}
 	} else {
@@ -209,10 +202,10 @@ async function main() {
 			{
 				hosts: runwayCleartextHttpsHostList(firstTest),
 				site: runwayCleartextSiteForHarness(firstTest),
-			}
+			},
 		);
 
-		if (firstTest.topLevelScramjet) {
+		if (firstTest.topLevelRamjet) {
 			const proxiedUrl = await page.evaluate((url) => {
 				if (typeof (window as any).__runwayGetProxiedUrl === "function") {
 					return (window as any).__runwayGetProxiedUrl(url);
@@ -236,7 +229,7 @@ async function main() {
 				}
 			}, proxiedUrl);
 
-			console.log(`🌐 Opening top-level Scramjet page: ${proxiedUrl}`);
+			console.log(`🌐 Opening top-level Ramjet page: ${proxiedUrl}`);
 			await page.goto(proxiedUrl, { waitUntil: "commit" });
 		} else {
 			await page.evaluate((url) => {
@@ -257,7 +250,6 @@ async function main() {
 		console.log();
 	}
 
-	// Keep the process running
 	await new Promise(() => {});
 }
 

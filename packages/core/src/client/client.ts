@@ -3,7 +3,7 @@ import {
 	ProxyTransport,
 	RawHeaders,
 } from "@mercuryworkshop/proxy-transports";
-import { SCRAMJETCLIENT } from "@/symbols";
+import { RAMJETCLIENT } from "@/symbols";
 import { getOwnPropertyDescriptorHandler } from "@client/helpers";
 import { createLocationProxy } from "@client/location";
 import { createWrapFn } from "@client/shared/wrap";
@@ -17,12 +17,12 @@ import {
 import {
 	flagEnabled,
 	HtmlRewriterHooks,
-	ScramjetContext,
-	ScramjetHeaders,
+	RamjetContext,
+	RamjetHeaders,
 } from "@/shared";
 import { iswindow } from "./entry";
 import { SingletonBox } from "./singletonbox";
-import { ScramjetConfig } from "@/types";
+import { RamjetConfig } from "@/types";
 import { Tap } from "@/Tap";
 import {
 	type CookieSyncEntry,
@@ -67,15 +67,15 @@ type ProxyApplyThis<T extends string> =
 			: unknown
 		: ThisParameterType<Extract<GlobalTraverse<T>, AnyFunction>>;
 
-export type ScramjetClientInit = {
-	context: ScramjetContext;
+export type RamjetClientInit = {
+	context: RamjetContext;
 	transport: ProxyTransport;
 	sendSetCookie: (
 		cookies: CookieSyncEntry[],
-		options?: CookieSyncOptions
+		options?: CookieSyncOptions,
 	) => Promise<void>;
 	shouldBlockMessageEvent?: (ev: MessageEvent) => boolean;
-	hookSubcontext: (self: Self, frame?: HTMLIFrameElement) => ScramjetClient;
+	hookSubcontext: (self: Self, frame?: HTMLIFrameElement) => RamjetClient;
 	initHeaders: RawHeaders;
 	history: TrackedHistoryState[];
 };
@@ -97,7 +97,7 @@ type DescriptorStore = {
 	set: <T extends string>(
 		target: T,
 		that: any,
-		value: GlobalTraverse<T>
+		value: GlobalTraverse<T>,
 	) => void;
 };
 
@@ -120,7 +120,7 @@ export type ProxyCtx<
 			"construct",
 			InstanceType<GlobalTraverse<T>>,
 			ReturnType<GlobalTraverse<T>>
-		>
+		>,
 	) => void;
 	call: () => IfEquals<
 		U,
@@ -148,11 +148,11 @@ export type Trap<T extends string> = {
 	set?: (ctx: TrapCtx<T>, v: GlobalTraverse<T>) => void;
 };
 
-export type ScramjetModule = {
-	enabled: (client: ScramjetClient) => boolean | undefined;
-	disabled: (client: ScramjetClient, self: GlobalThis) => void | undefined;
+export type RamjetModule = {
+	enabled: (client: RamjetClient) => boolean | undefined;
+	disabled: (client: RamjetClient, self: GlobalThis) => void | undefined;
 	order: number | undefined;
-	default: (client: ScramjetClient, self: GlobalThis) => void;
+	default: (client: RamjetClient, self: GlobalThis) => void;
 };
 
 function findBox(global: Window, seen: Window[]): SingletonBox | null {
@@ -160,8 +160,8 @@ function findBox(global: Window, seen: Window[]): SingletonBox | null {
 	seen.push(global);
 
 	try {
-		if ((SCRAMJETCLIENT in global) as any) {
-			return global[SCRAMJETCLIENT].box;
+		if ((RAMJETCLIENT in global) as any) {
+			return global[RAMJETCLIENT].box;
 		}
 	} catch {}
 
@@ -192,7 +192,7 @@ function findBox(global: Window, seen: Window[]): SingletonBox | null {
 	return null;
 }
 
-export class ScramjetClient {
+export class RamjetClient {
 	locationProxy: any;
 	indirectEval: any;
 	serviceWorker: ServiceWorkerContainer;
@@ -217,13 +217,13 @@ export class ScramjetClient {
 
 	box: SingletonBox;
 
-	context: ScramjetContext;
+	context: RamjetContext;
 
-	initHeaders: ScramjetHeaders;
+	initHeaders: RamjetHeaders;
 
 	history: TrackedHistoryState[];
 
-	private flagCache = new _Map<keyof ScramjetConfig["flags"], boolean>();
+	private flagCache = new _Map<keyof RamjetConfig["flags"], boolean>();
 
 	hooks = {
 		rewriter: {
@@ -234,11 +234,11 @@ export class ScramjetClient {
 
 	constructor(
 		public global: GlobalThis,
-		public init: ScramjetClientInit
+		public init: RamjetClientInit,
 	) {
-		if (SCRAMJETCLIENT in global) {
+		if (RAMJETCLIENT in global) {
 			dbg.error(
-				"attempted to initialize a scramjet client, but one is already loaded - this is very bad"
+				"attempted to initialize a ramjet client, but one is already loaded - this is very bad",
 			);
 			throw new Error();
 		}
@@ -258,7 +258,7 @@ export class ScramjetClient {
 
 		this.context = init.context;
 		if (init.initHeaders)
-			this.initHeaders = ScramjetHeaders.fromRawHeaders(init.initHeaders);
+			this.initHeaders = RamjetHeaders.fromRawHeaders(init.initHeaders);
 		this.history = init.history;
 		this.context.hooks = {
 			rewriter: this.hooks.rewriter,
@@ -269,7 +269,7 @@ export class ScramjetClient {
 		this.serviceWorker = this.global.navigator.serviceWorker;
 
 		if (iswindow) {
-			global.document[SCRAMJETCLIENT] = this;
+			global.document[RAMJETCLIENT] = this;
 		}
 
 		this.indirectEval = createIndirectEval(this);
@@ -294,7 +294,7 @@ export class ScramjetClient {
 
 						return target[prop];
 					},
-				}
+				},
 			),
 			construct(target, ...args) {
 				const original = this.store[target];
@@ -328,13 +328,13 @@ export class ScramjetClient {
 							"Object.getOwnPropertyDescriptor",
 							null,
 							realTarget,
-							realProp
+							realProp,
 						);
 						target[prop] = original;
 
 						return target[prop];
 					},
-				}
+				},
 			),
 			get(target, that) {
 				const original = this.store[target];
@@ -360,7 +360,7 @@ export class ScramjetClient {
 					const base = client.natives.call(
 						"Document.prototype.querySelector",
 						client.global.document,
-						"base"
+						"base",
 					);
 					if (base) {
 						let url = base.getAttribute("href");
@@ -375,7 +375,7 @@ export class ScramjetClient {
 
 				return client.url;
 			},
-			// TODO: very bad assumptions made here, window.parent never throws
+
 			get topFrameName() {
 				if (!iswindow)
 					throw new Error("topFrameName was called from a worker?");
@@ -384,43 +384,34 @@ export class ScramjetClient {
 
 				try {
 					if (currentWin.parent.window == currentWin.window) {
-						// we're top level & we don't have a frame name
 						return null;
 					}
-				} catch {
-					// accessing parent was blocked by CORS, we're in a frame but the parent is cross origin
-				}
+				} catch {}
 
 				try {
-					// find the topmost frame that's controlled by scramjet, stopping before the real top frame
 					while (currentWin.parent.window !== currentWin.window) {
-						if (!currentWin.parent.window[SCRAMJETCLIENT]) break;
+						if (!currentWin.parent.window[RAMJETCLIENT]) break;
 						currentWin = currentWin.parent.window;
 					}
-				} catch {
-					// doesn't matter if it throws here just means we found the topmost one
-				}
+				} catch {}
 
-				const curclient = currentWin[SCRAMJETCLIENT];
+				const curclient = currentWin[RAMJETCLIENT];
 				const frame = curclient.descriptors.get(
 					"window.frameElement",
-					currentWin
+					currentWin,
 				);
 				if (!frame) {
-					// we're inside an iframe, but the top frame is scramjet-controlled and top level, so we can't get a top frame name
-					// or we're cross-origin and frameElement doesn't exist. that's a TODO because this won't work
 					return null;
 				}
-				if (!frame.name) {
-					// the top frame is scramjet-controlled, but it has no name. this is user error
+				if (!(frame as HTMLIFrameElement).name) {
 					dbg.error(
-						"YOU NEED TO USE `new ScramjetFrame()`! DIRECT IFRAMES WILL NOT WORK"
+						"YOU NEED TO USE `new RamjetFrame()`! DIRECT IFRAMES WILL NOT WORK",
 					);
 
 					return null;
 				}
 
-				return frame.name;
+				return (frame as HTMLIFrameElement).name;
 			},
 			get parentFrameName() {
 				if (!iswindow)
@@ -429,55 +420,47 @@ export class ScramjetClient {
 				try {
 					try {
 						if (client.global.parent.window == client.global.window) {
-							// we're top level & we don't have a frame name
 							return null;
 						}
 					} catch {
-						// accessing parent was blocked by CORS, we're in a frame but the parent is cross origin
 						return null;
 					}
 
 					const parentWin = client.global.parent.window;
-					if (parentWin[SCRAMJETCLIENT]) {
-						// we're inside an iframe, and the parent is scramjet-controlled
-						const parentClient = parentWin[SCRAMJETCLIENT];
+					if (parentWin[RAMJETCLIENT]) {
+						const parentClient = parentWin[RAMJETCLIENT];
 						const frame = parentClient.descriptors.get(
 							"window.frameElement",
-							parentWin
+							parentWin,
 						);
 
 						if (!frame) {
-							// parent is scramjet controlled and top-level. there is no parent frame name
 							return null;
 						}
 
-						if (!frame.name) {
-							// the parent frame is scramjet-controlled, but it has no name. this is user error
+						if (!(frame as HTMLIFrameElement).name) {
 							dbg.error(
-								"YOU NEED TO USE `new ScramjetFrame()`! DIRECT IFRAMES WILL NOT WORK"
+								"YOU NEED TO USE `new RamjetFrame()`! DIRECT IFRAMES WILL NOT WORK",
 							);
 
 							return null;
 						}
 
-						return frame.name;
+						return (frame as HTMLIFrameElement).name;
 					} else {
-						// we're inside an iframe, and the parent is not scramjet-controlled
-						// return our own frame name
 						const frame = client.descriptors.get(
 							"window.frameElement",
-							client.global
+							client.global,
 						);
-						if (!frame.name) {
-							// the parent frame is not scramjet-controlled, so we can't get a parent frame name
+						if (!(frame as HTMLIFrameElement).name) {
 							dbg.error(
-								"YOU NEED TO USE `new ScramjetFrame()`! DIRECT IFRAMES WILL NOT WORK"
+								"YOU NEED TO USE `new RamjetFrame()`! DIRECT IFRAMES WILL NOT WORK",
 							);
 
 							return null;
 						}
 
-						return frame.name;
+						return (frame as HTMLIFrameElement).name;
 					}
 				} catch {
 					return null;
@@ -489,22 +472,21 @@ export class ScramjetClient {
 				}
 				if (!iswindow) return "";
 
-				// TODO: need to nullify the actual meta tag so it still sends unsafe-url
 				const meta = [
 					...client.natives.call(
 						"Document.prototype.querySelectorAll",
 						client.global.document,
-						"meta[name='referrer']"
+						"meta[name='referrer']",
 					),
 					...client.natives.call(
 						"Document.prototype.querySelectorAll",
 						client.global.document,
-						"meta[name='referrer-policy']"
+						"meta[name='referrer-policy']",
 					),
 					...client.natives.call(
 						"Document.prototype.querySelectorAll",
 						client.global.document,
-						"meta[http-equiv='referrer-policy']"
+						"meta[http-equiv='referrer-policy']",
 					),
 				];
 				const last = meta[meta.length - 1];
@@ -517,16 +499,15 @@ export class ScramjetClient {
 		};
 		this.locationProxy = createLocationProxy(this, global);
 
-		global[SCRAMJETCLIENT] = this;
+		global[RAMJETCLIENT] = this;
 	}
 
-	/** Apply document injection init when a client was already installed (e.g. early contentWindow). */
 	syncDocumentInit(init: {
 		initHeaders: RawHeaders;
 		history: TrackedHistoryState[];
 		cookies?: string;
 	}) {
-		this.initHeaders = ScramjetHeaders.fromRawHeaders(init.initHeaders);
+		this.initHeaders = RamjetHeaders.fromRawHeaders(init.initHeaders);
 		this.history = init.history;
 		if (init.cookies !== undefined) {
 			this.context.cookieJar.load(init.cookies);
@@ -538,10 +519,10 @@ export class ScramjetClient {
 			recursive: true,
 		});
 
-		const modules: ScramjetModule[] = [];
+		const modules: RamjetModule[] = [];
 
 		for (const key of context.keys()) {
-			const module = context(key) as ScramjetModule;
+			const module = context(key) as RamjetModule;
 			if (!key.endsWith(".ts")) continue;
 			if (
 				(key.startsWith("./dom/") && "window" in this.global) ||
@@ -580,7 +561,7 @@ export class ScramjetClient {
 			},
 			{
 				url,
-			}
+			},
 		);
 
 		this.global.location.href = this.rewriteUrl(url, {
@@ -588,13 +569,10 @@ export class ScramjetClient {
 		});
 	}
 
-	// below are the utilities for proxying and trapping dom APIs
-	// you don't have to understand this it just makes the rest easier
-	// i'll document it eventually
 	Proxy<T extends string>(name: T, handler: Proxy<T>): void;
 	Proxy<const T extends readonly string[]>(
 		name: T,
-		handler: Proxy<T[number]>
+		handler: Proxy<T[number]>,
 	): void;
 	Proxy(name: string | string[], handler: Proxy<any>): void {
 		if (Array_isArray(name)) {
@@ -646,7 +624,6 @@ export class ScramjetClient {
 			if (!windowName) windowName = "<unnamed window>";
 			let location = this.url.href;
 
-			// sanitize newlines just in case somehow
 			location = location.replace(/\n/g, "\\n").replace(/\r/g, "\\r");
 			windowName = windowName.replace(/\n/g, "\\n").replace(/\r/g, "\\r");
 			fnName = fnName.replace(/\n/g, "\\n").replace(/\r/g, "\\r");
@@ -657,7 +634,7 @@ export class ScramjetClient {
 				null,
 				`"use strict";
 
-// SCRAMJET FUNCTION INTERCEPT
+// RAMJET FUNCTION INTERCEPT
 // target: ${fnName}
 // frame: ${windowName}
 // location: ${location}
@@ -672,7 +649,7 @@ function construct(fn, args, newTarget) {
 
 return { apply, construct };
 
-//# sourceURL=${sourceURL}`
+//# sourceURL=${sourceURL}`,
 			)();
 
 			applyFn = apply;
@@ -686,7 +663,7 @@ return { apply, construct };
 			h.construct = function (
 				constructor: any,
 				args: any[],
-				newTarget: AnyFunction
+				newTarget: AnyFunction,
 			) {
 				let returnValue: any = undefined;
 				let earlyreturn = false;
@@ -743,7 +720,6 @@ return { apply, construct };
 					!this.flagEnabled("debugTrampolines") &&
 					this.flagEnabled("allowFailedIntercepts")
 				) {
-					// fast path, no error detection
 					handler.apply(ctx);
 
 					if (earlyreturn) {
@@ -770,10 +746,9 @@ return { apply, construct };
 				} catch (err) {
 					if (this.box.instanceof(err, "Error")) {
 						if (this.box.instanceof(err.stack, "Object")) {
-							//i'm not going to explain this
 							err.stack = err.stack.stack;
-							// eslint-disable-next-line scramjet-core/no-globals
-							console.error("ERROR FROM SCRAMJET INTERNALS", err);
+							// eslint-disable-next-line ramjet-core/no-globals
+							console.error("ERROR FROM RAMJET INTERNALS", err);
 							if (!this.flagEnabled("allowFailedIntercepts")) {
 								Error.prepareStackTrace = pst;
 								throw err;
@@ -801,7 +776,7 @@ return { apply, construct };
 		const proxy = new Proxy(value, h);
 		this.box.unproxy.set(proxy, value);
 		h.getOwnPropertyDescriptor = getOwnPropertyDescriptorHandler;
-		// Preserve original property descriptor (enumerable, configurable, etc.)
+
 		Object_defineProperty(target, prop, {
 			value: proxy,
 			writable: originalDescriptor?.writable ?? true,
@@ -812,7 +787,7 @@ return { apply, construct };
 	Trap<T extends string>(name: T, handler: Trap<T>): void;
 	Trap<const T extends readonly string[]>(
 		name: T,
-		handler: Trap<T[number]>
+		handler: Trap<T[number]>,
 	): void;
 	Trap(name: string | string[], descriptor: Trap<any>): void {
 		if (Array_isArray(name)) {
@@ -833,7 +808,7 @@ return { apply, construct };
 			"Object.getOwnPropertyDescriptor",
 			null,
 			target,
-			prop
+			prop,
 		);
 		this.descriptors.store[name] = original;
 
@@ -848,7 +823,7 @@ return { apply, construct };
 			"Object.getOwnPropertyDescriptor",
 			null,
 			target,
-			prop
+			prop,
 		);
 
 		const ctx: TrapCtx<any> = {
@@ -904,7 +879,7 @@ return { apply, construct };
 		return unrewriteUrl(url, this.context);
 	}
 
-	flagEnabled(flag: keyof ScramjetConfig["flags"]): boolean {
+	flagEnabled(flag: keyof RamjetConfig["flags"]): boolean {
 		const cached = this.flagCache.get(flag);
 		if (cached !== undefined) return cached;
 
@@ -913,7 +888,7 @@ return { apply, construct };
 		return result;
 	}
 
-	get config(): ScramjetConfig {
+	get config(): RamjetConfig {
 		return this.context.config;
 	}
 }

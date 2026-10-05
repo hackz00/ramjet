@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="456" viewBox="0 0 760 456" font-family="Segoe UI, Arial, sans-serif" font-size="13" role="img" aria-label="Memory after load">
+<style>
+  .card{fill:#ffffff;stroke:#d5dbe3}
+  .t{fill:#14213d;font-size:17px;font-weight:600} .s{fill:#5b6675;font-size:12.5px}
+  .l{fill:#1f2933;font-size:13px} .v{fill:#1f2933;font-size:12px}
+  .base{fill:#a7b1bd} .cand{fill:#1f5fe0} .good{fill:#0e8a4f;font-size:12px;font-weight:600} .bad{fill:#c2410c;font-size:12px;font-weight:600}
+  .axis{stroke:#e3e8ee} .zero{stroke:#7b8794}
+  @media (prefers-color-scheme: dark){
+    .card{fill:#0f1720;stroke:#2b3745} .t{fill:#f1f5f9} .s{fill:#9fb0c3} .l,.v{fill:#e5ebf2}
+    .base{fill:#5c6b7c} .cand{fill:#5b9bff} .good{fill:#4ade80} .bad{fill:#fb923c} .axis{stroke:#243241} .zero{stroke:#9fb0c3}
+  }
+</style>
+<rect class="card" x="0.5" y="0.5" width="759" height="455" rx="6"/>
+<text class="t" x="24" y="42">Memory after load</text>
+<text class="s" x="24" y="62">cold visit, median of 7 runs</text>
+<text class="l" x="24" y="96">article</text>
+<rect class="base" x="174" y="80" width="247.7" height="15" rx="3"/>
+<text class="v" x="427.6802291119685" y="92">6.0 MB</text>
+<rect class="cand" x="174" y="98" width="213.9" height="15" rx="3"/>
+<text class="v" x="393.9339202825628" y="110">5.1 MB</text>
+<text class="good" x="736" y="104" text-anchor="end">-14%</text>
+<text class="l" x="24" y="142">spa</text>
+<rect class="base" x="174" y="126" width="442.0" height="15" rx="3"/>
+<text class="v" x="622" y="138">10.6 MB</text>
+<rect class="cand" x="174" y="144" width="408.7" height="15" rx="3"/>
+<text class="v" x="588.6665939053546" y="156">9.8 MB</text>
+<text class="good" x="736" y="150" text-anchor="end">-8%</text>
+<text class="l" x="24" y="188">css-heavy</text>
+<rect class="base" x="174" y="172" width="263.7" height="15" rx="3"/>
+<text class="v" x="443.6839392208484" y="184">6.3 MB</text>
+<rect class="cand" x="174" y="190" width="220.9" height="15" rx="3"/>
+<text class="v" x="400.8843967554678" y="202">5.3 MB</text>
+<text class="good" x="736" y="196" text-anchor="end">-16%</text>
+<text class="l" x="24" y="234">grid</text>
+<rect class="base" x="174" y="218" width="241.5" height="15" rx="3"/>
+<text class="v" x="421.54238711435454" y="230">5.8 MB</text>
+<rect class="cand" x="174" y="236" width="203.0" height="15" rx="3"/>
+<text class="v" x="383.00723173245285" y="248">4.9 MB</text>
+<text class="good" x="736" y="242" text-anchor="end">-16%</text>
+<text class="l" x="24" y="280">news</text>
+<rect class="base" x="174" y="264" width="250.4" height="15" rx="3"/>
+<text class="v" x="430.4334429659617" y="276">6.0 MB</text>
+<rect class="cand" x="174" y="282" width="216.3" height="15" rx="3"/>
+<text class="v" x="396.2696294881493" y="294">5.2 MB</text>
+<text class="good" x="736" y="288" text-anchor="end">-14%</text>
+<text class="l" x="24" y="326">interactive</text>
+<rect class="base" x="174" y="310" width="233.6" height="15" rx="3"/>
+<text class="v" x="413.55235421738564" y="322">5.6 MB</text>
+<rect class="cand" x="174" y="328" width="199.5" height="15" rx="3"/>
+<text class="v" x="379.45439571072063" y="340">4.8 MB</text>
+<text class="good" x="736" y="334" text-anchor="end">-15%</text>
+<text class="l" x="24" y="372">frames</text>
+<rect class="base" x="174" y="356" width="339.9" height="15" rx="3"/>
+<text class="v" x="519.8570355102728" y="368">8.2 MB</text>
+<rect class="cand" x="174" y="374" width="306.0" height="15" rx="3"/>
+<text class="v" x="486.0331288955874" y="386">7.4 MB</text>
+<text class="good" x="736" y="380" text-anchor="end">-10%</text>
+
+<rect class="base" x="24" y="402" width="12" height="12" rx="2"/><text class="s" x="42" y="412">Scramjet 2.0.67 (upstream)</text>
+<rect class="cand" x="254" y="402" width="12" height="12" rx="2"/><text class="s" x="272" y="412">Ramjet</text>
+<text class="s" x="736" y="412" text-anchor="end">lower is better</text>
+</svg>

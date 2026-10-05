@@ -1,12 +1,10 @@
-import { getFlag, ScramjetContext } from "@/shared";
+import { RamjetContext } from "@/shared";
 import { rewriteUrl, unrewriteUrl, URLMeta } from "@rewriters/url";
-import { ScramjetClient } from "@client/index";
+import { RamjetClient } from "@client/index";
 
-export default function (client: ScramjetClient, self: Self) {
+export default function (client: RamjetClient, self: Self) {
 	let worker;
-	// if (self.Worker && flagEnabled("syncxhr", client.url)) {
-	// 	worker = client.natives.construct("Worker", config.files.sync);
-	// }
+
 	const ARGS = Symbol("xhr original args");
 	const HEADERS = Symbol("xhr headers");
 
@@ -30,15 +28,11 @@ export default function (client: ScramjetClient, self: Self) {
 			const args = ctx.this[ARGS];
 			if (!args || args[2]) return;
 
-			if (!client.getFlag("syncxhr")) {
+			if (!client.flagEnabled("syncxhr")) {
 				console.warn("ignoring request - sync xhr disabled in flags");
 
 				return ctx.return(undefined);
 			}
-
-			// it's a sync request
-			// sync xhr to service worker is not supported
-			// there's a nice way of polyfilling this though, we can spin on an atomic using sharedarraybuffer. this will maintain the sync behavior
 
 			//@ts-ignore
 			const sab = new SharedArrayBuffer(1024, { maxByteLength: 2147483647 });
@@ -56,7 +50,6 @@ export default function (client: ScramjetClient, self: Self) {
 				if (performance.now() - now > 1000) {
 					throw new Error("xhr timeout");
 				}
-				/* spin */
 			}
 
 			const status = view.getUint16(1);
@@ -70,12 +63,11 @@ export default function (client: ScramjetClient, self: Self) {
 			const bodyab = new Uint8Array(bodyLength);
 			bodyab.set(
 				new Uint8Array(
-					sab.slice(11 + headersLength, 11 + headersLength + bodyLength)
-				)
+					sab.slice(11 + headersLength, 11 + headersLength + bodyLength),
+				),
 			);
 			const body = new TextDecoder().decode(bodyab);
 
-			// these should be using proxies to not leak scram strings but who cares
 			client.RawTrap(ctx.this, "status", {
 				get() {
 					return status;
@@ -136,7 +128,7 @@ export default function (client: ScramjetClient, self: Self) {
 				if (header.toLowerCase().startsWith("link:")) {
 					headers[i] = `Link: ${unrewriteLinkHeader(
 						header.slice(5).trim(),
-						client.context
+						client.context,
 					)}`;
 				}
 			}
@@ -155,9 +147,9 @@ export default function (client: ScramjetClient, self: Self) {
 	});
 }
 
-export function unrewriteLinkHeader(header: string, context: ScramjetContext) {
+export function unrewriteLinkHeader(header: string, context: RamjetContext) {
 	return header.replace(
 		/<([^>]+)>/gi,
-		(_match, p1) => `<${unrewriteUrl(p1, context)}>`
+		(_match, p1) => `<${unrewriteUrl(p1, context)}>`,
 	);
 }

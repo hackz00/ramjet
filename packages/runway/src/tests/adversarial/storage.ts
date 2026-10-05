@@ -1,15 +1,5 @@
 import { basicTest } from "../../testcommon.ts";
 
-// Storage is namespaced per proxied origin, so the keys a page writes are not
-// the keys the backing store holds. Every enumeration route has to un-namespace
-// consistently: getItem, length, key(i), Object.keys, for-in and direct
-// property access.
-//
-// Tests get a fresh port but the OS may hand the same port to a later test, so
-// the store is not guaranteed empty - and clear() cannot be used to reset it
-// (see storage-clear). Each test therefore works under its own key prefix and
-// measures length as a delta.
-
 const storageTest = (name: string, prefix: string, body: string) =>
 	basicTest({
 		name,
@@ -42,7 +32,7 @@ export default [
 			localStorage.removeItem(P + "alpha");
 			assertEqual(localStorage.getItem(P + "alpha"), null, "removeItem");
 			assertEqual(grew(), 1, "length after removeItem");
-		`
+		`,
 	),
 	storageTest(
 		"storage-object-keys",
@@ -63,7 +53,7 @@ export default [
 			);
 			const parsed = JSON.parse(JSON.stringify(localStorage));
 			assertEqual(parsed[P + "alpha"], "1", "JSON.stringify");
-		`
+		`,
 	),
 	storageTest(
 		"storage-for-in",
@@ -73,9 +63,9 @@ export default [
 			const seen = [];
 			for (const k in localStorage) seen.push(k);
 			assert(seen.includes(P + "alpha"), "for-in must yield the page's key, got " + JSON.stringify(seen));
-			assert(!seen.some((k) => k.includes("scramjet")),
+			assert(!seen.some((k) => k.includes("ramjet")),
 				"for-in must not leak namespaced keys, got " + JSON.stringify(seen));
-		`
+		`,
 	),
 	storageTest(
 		"storage-property-access",
@@ -88,7 +78,7 @@ export default [
 			assert((P + "gamma") in localStorage, "in operator");
 			localStorage.setItem(P + "delta", "4");
 			assertEqual(localStorage[P + "delta"], "4", "setItem is visible as a property");
-		`
+		`,
 	),
 	storageTest(
 		"storage-coercion-and-brand",
@@ -103,7 +93,7 @@ export default [
 			assertEqual(localStorage, window.localStorage, "stable identity");
 			assertEqual(typeof localStorage.setItem, "function", "setItem is a function");
 			assertEqual(typeof localStorage.key, "function", "key is a function");
-		`
+		`,
 	),
 	storageTest(
 		"storage-session-isolation",
@@ -121,7 +111,7 @@ export default [
 			} finally {
 				sessionStorage.removeItem(P + "s");
 			}
-		`
+		`,
 	),
 	storageTest(
 		"storage-json-payload",
@@ -133,14 +123,10 @@ export default [
 			localStorage.setItem(P + "weird:key/with.chars", "v");
 			assertEqual(localStorage.getItem(P + "weird:key/with.chars"), "v", "punctuation in keys");
 			assert(mine().includes(P + "weird:key/with.chars"), "and it enumerates");
-		`
+		`,
 	),
 
-	// ------------------------------------------------------------------
 	storageTest(
-		// KNOWN FAILURE: key(i) returns the stored *value* instead of the key.
-		// `for (let i = 0; i < localStorage.length; i++) localStorage.key(i)` is
-		// the canonical way to enumerate storage.
 		"storage-key-by-index",
 		"si2:",
 		`
@@ -151,10 +137,9 @@ export default [
 			assert(keys.includes(P + "alpha"), "key(i) must return keys, got " + JSON.stringify(keys));
 			assert(keys.includes(P + "beta"), "key(i) must return every key");
 			assertEqual(localStorage.key(localStorage.length + 50), null, "an out-of-range index is null");
-		`
+		`,
 	),
 	storageTest(
-		// KNOWN FAILURE: `delete storage.foo` does not remove the entry.
 		"storage-delete-property",
 		"sd:",
 		`
@@ -162,12 +147,9 @@ export default [
 			assertEqual(delete localStorage[P + "gamma"], true, "delete reports success");
 			assertEqual(localStorage.getItem(P + "gamma"), null, "delete must remove the entry");
 			assertEqual(grew(), 0, "length back to where it started");
-		`
+		`,
 	),
 	basicTest({
-		// KNOWN FAILURE: clear() is a no-op - length, getItem, key(i) and
-		// Object.keys all still report every entry afterwards. Logout and
-		// "reset my settings" flows depend on it.
 		name: "storage-clear",
 		js: `
 			localStorage.setItem("clear-a", "1");
@@ -180,9 +162,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: a missing key read as a property yields null instead of
-		// undefined, so `storage.foo === undefined` and `typeof storage.foo`
-		// checks take the wrong branch.
 		name: "storage-missing-property-is-undefined",
 		js: `
 			assertEqual(localStorage["definitely-absent-key"], undefined, "a missing property is undefined");
@@ -202,9 +181,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: no storage event is delivered to other same-origin
-		// documents at all. Tabs and frames use it to stay in sync - propagating
-		// a logout, an auth-token refresh, a theme change - and none of that fires.
 		name: "storage-event-child-frame",
 		js: `
 			const f = document.createElement("iframe");
@@ -223,7 +199,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: same in the other direction.
 		name: "storage-event-parent-listens",
 		js: `
 			const f = document.createElement("iframe");

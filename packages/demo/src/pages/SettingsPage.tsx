@@ -9,12 +9,14 @@ import {
 	normalizeMaxRequests,
 	normalizeTransport,
 	normalizeWispUrl,
+	normalizeAssistedUrl,
 } from "../store";
 
 const SettingsView: Component<
 	{},
 	{
 		wispUrlInput: string;
+		assistedUrlInput: string;
 		transportInput: AvailableTransports;
 		homeUrlInput: string;
 		maxRequestsInput: string;
@@ -24,6 +26,7 @@ const SettingsView: Component<
 	{}
 > = function () {
 	this.wispUrlInput ??= demoSettingsStore.wispUrl;
+	this.assistedUrlInput ??= demoSettingsStore.assistedUrl;
 	this.transportInput ??= demoSettingsStore.transport;
 	this.homeUrlInput ??= demoSettingsStore.homeUrl;
 	this.maxRequestsInput ??= String(demoSettingsStore.maxRequests);
@@ -32,6 +35,7 @@ const SettingsView: Component<
 
 	const syncInputsFromStore = () => {
 		this.wispUrlInput = demoSettingsStore.wispUrl;
+		this.assistedUrlInput = demoSettingsStore.assistedUrl;
 		this.transportInput = demoSettingsStore.transport;
 		this.homeUrlInput = demoSettingsStore.homeUrl;
 		this.maxRequestsInput = String(demoSettingsStore.maxRequests);
@@ -43,27 +47,33 @@ const SettingsView: Component<
 
 		try {
 			const nextWispUrl = normalizeWispUrl(this.wispUrlInput);
+			const nextAssistedUrl = normalizeAssistedUrl(this.assistedUrlInput);
 			const nextTransport = normalizeTransport(this.transportInput);
 			const nextHomeUrl = normalizeHomeUrl(this.homeUrlInput);
 			const nextMaxRequests = normalizeMaxRequests(this.maxRequestsInput);
 			const wispChanged = nextWispUrl !== demoSettingsStore.wispUrl;
+			const assistedChanged = nextAssistedUrl !== demoSettingsStore.assistedUrl;
 			const transportChanged = nextTransport !== demoSettingsStore.transport;
 
 			demoSettingsStore.wispUrl = nextWispUrl;
+			demoSettingsStore.assistedUrl = nextAssistedUrl;
 			demoSettingsStore.transport = nextTransport;
 			demoSettingsStore.homeUrl = nextHomeUrl;
 			demoSettingsStore.maxRequests = nextMaxRequests;
 
 			this.wispUrlInput = nextWispUrl;
+			this.assistedUrlInput = nextAssistedUrl;
 			this.transportInput = nextTransport;
 			this.homeUrlInput = nextHomeUrl;
 			this.maxRequestsInput = String(nextMaxRequests);
 
-			if (wispChanged || transportChanged) {
+			const connectionChanged = transportChanged ||
+				(nextTransport === "assisted" ? assistedChanged : wispChanged);
+			if (connectionChanged) {
 				controller.setTransport(getTransport());
 			}
 			this.status =
-				wispChanged || transportChanged
+				connectionChanged
 					? "Settings saved. Transport updated for new requests."
 					: "Settings saved.";
 		} catch (error) {
@@ -77,6 +87,7 @@ const SettingsView: Component<
 		this.error = "";
 		this.status = "Resetting settings...";
 		this.wispUrlInput = demoSettingsDefaults.wispUrl;
+		this.assistedUrlInput = demoSettingsDefaults.assistedUrl;
 		this.transportInput = demoSettingsDefaults.transport;
 		this.homeUrlInput = demoSettingsDefaults.homeUrl;
 		this.maxRequestsInput = String(demoSettingsDefaults.maxRequests);
@@ -88,7 +99,7 @@ const SettingsView: Component<
 			<div class="settings-header">
 				<h2>Demo Settings</h2>
 				<p>
-					Update runtime settings without rebuilding the demo. Wisp changes
+					Update runtime settings without rebuilding the demo. Server changes
 					apply to future requests only.
 				</p>
 			</div>
@@ -107,6 +118,19 @@ const SettingsView: Component<
 			</label>
 
 			<label class="field">
+				<span class="label">Assisted server</span>
+				<input
+					type="text"
+					value={use(this.assistedUrlInput)}
+					spellcheck={false}
+					on:input={(e: InputEvent) => {
+						this.assistedUrlInput = (e.target as HTMLInputElement).value;
+					}}
+				/>
+				<span class="hint">Example: ws://localhost:4143/assisted (wss:// on HTTPS deployments)</span>
+			</label>
+
+			<label class="field">
 				<span class="label">Transport</span>
 				<select
 					value={use(this.transportInput)}
@@ -120,7 +144,7 @@ const SettingsView: Component<
 					))}
 				</select>
 				<span class="hint">
-					Transport client used to dispatch outbound requests over Wisp.
+					Assisted uses the assisted server; libcurl and Epoxy use Wisp.
 				</span>
 			</label>
 

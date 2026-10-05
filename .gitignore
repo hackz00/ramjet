@@ -4,4 +4,13 @@ packages/core/rewriter/target
 packages/core/rewriter/wasm/out
 packages/core/rewriter/*.js
 packages/core/README.md
-packages/runway/coverage
+packages/runway/coverage.superpowers/
+bench/baseline-dist/*/
+packages/bench/results/*
+!packages/bench/results/baseline-*.json
+!packages/bench/results/final/
+
+# Local comparison launcher and private browser/testing state
+.local/
+release-artifacts/
+/GITHUB-READY/

@@ -1,16 +1,14 @@
-import { ScramjetClient } from "@client/index";
-import { SCRAMJETCLIENT } from "@/symbols";
+import { RamjetClient } from "@client/index";
+import { RAMJETCLIENT } from "@/symbols";
 import { String } from "@/shared/snapshot";
 
-export default function (client: ScramjetClient) {
+export default function (client: RamjetClient) {
 	client.Proxy("window.open", {
 		apply(ctx) {
-			// undefined opens an about:blank window, pass through
 			if (typeof ctx.args[0] !== "undefined") {
 				const url = String(ctx.args[0]);
-				// blank also opens an about:blank window
+
 				if (url !== "") {
-					// note that null or anything else will *not* open an about:blank window
 					ctx.args[0] = client.rewriteUrl(url);
 				}
 			}
@@ -32,8 +30,7 @@ export default function (client: ScramjetClient) {
 
 			if (!realwin) return ctx.return(realwin);
 
-			if (!(SCRAMJETCLIENT in realwin)) {
-				// i don't believe it's possible for a just-opened window to already have scramjet loaded but just in case
+			if (!(RAMJETCLIENT in realwin)) {
 				client.init.hookSubcontext(realwin);
 			}
 
@@ -47,11 +44,9 @@ export default function (client: ScramjetClient) {
 			if (!f) return f;
 
 			const win = f.ownerDocument.defaultView;
-			if (win[SCRAMJETCLIENT]) {
-				// then this is a subframe in a scramjet context, and it's safe to pass back the real iframe
+			if (win[RAMJETCLIENT]) {
 				return f;
 			} else {
-				// no, the top frame is outside the sandbox
 				return null;
 			}
 		},

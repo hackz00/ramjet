@@ -1,7 +1,7 @@
-import { ScramjetClient } from "@client/index";
+import { RamjetClient } from "@client/index";
 import { String } from "@/shared/snapshot";
 
-export default function (client: ScramjetClient, _self: Self) {
+export default function (client: RamjetClient, _self: Self) {
 	client.Proxy("CacheStorage.prototype.open", {
 		apply(ctx) {
 			ctx.args[0] = `${client.url.origin}@${ctx.args[0]}`;
@@ -26,6 +26,4 @@ export default function (client: ScramjetClient, _self: Self) {
 			ctx.args[0] = `${client.url.origin}@${ctx.args[0]}`;
 		},
 	});
-
-	// TODO - check if this might leak things if Response from fetch is passed in and the url isn't properly being unrewritten
 }

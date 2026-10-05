@@ -17,7 +17,7 @@ const repoRoot = path.resolve(__dirname, "../../../../../../..");
 const vendorRoot = path.join(__dirname, "vendored");
 const testServerCertRoot = path.join(
 	repoRoot,
-	"external/playwright/tests/config/testserver"
+	"external/playwright/tests/config/testserver",
 );
 
 const WPT_TESTHARNESS_JS = `
@@ -248,7 +248,7 @@ function replaceWptTokens(
 		httpPort: number;
 		httpsPort: number;
 		crossHost: string;
-	}
+	},
 ) {
 	return source
 		.replaceAll("{{host}}", props.host)
@@ -335,7 +335,7 @@ function maybeServeRedirect(
 	requestUrl: URL,
 	request: IncomingMessage,
 	response: ServerResponse,
-	ports: { httpPort: number; httpsPort: number }
+	ports: { httpPort: number; httpsPort: number },
 ) {
 	const redirection = requestUrl.searchParams.get("redirection");
 	if (!redirection || redirection === "no-redirect") return false;
@@ -395,7 +395,7 @@ function headersJson(request: IncomingMessage) {
 function serveTemplateResponse(
 	response: ServerResponse,
 	body: string,
-	headers: Record<string, string> = {}
+	headers: Record<string, string> = {},
 ) {
 	response.writeHead(200, {
 		"Access-Control-Allow-Origin": "*",
@@ -419,7 +419,7 @@ async function createWptServer(): Promise<{
 
 	const handler = async (
 		request: IncomingMessage,
-		response: ServerResponse
+		response: ServerResponse,
 	) => {
 		try {
 			const hostHeader = request.headers.host || "localhost";
@@ -428,7 +428,7 @@ async function createWptServer(): Promise<{
 			const protocol = request.socket.encrypted ? "https" : "http";
 			const requestUrl = new URL(
 				request.url || "/",
-				`${protocol}://${hostHeader}`
+				`${protocol}://${hostHeader}`,
 			);
 
 			if (requestUrl.pathname === "/") {
@@ -456,7 +456,7 @@ async function createWptServer(): Promise<{
 			if (requestUrl.pathname === "/common/get-host-info.sub.js") {
 				const source = await fs.readFile(
 					path.join(vendorRoot, "common/get-host-info.sub.js"),
-					"utf8"
+					"utf8",
 				);
 				serveTemplateResponse(
 					response,
@@ -466,7 +466,7 @@ async function createWptServer(): Promise<{
 						httpsPort,
 						crossHost,
 					}),
-					{ "Content-Type": "application/javascript; charset=utf-8" }
+					{ "Content-Type": "application/javascript; charset=utf-8" },
 				);
 				return;
 			}
@@ -478,9 +478,9 @@ async function createWptServer(): Promise<{
 				const source = await fs.readFile(
 					path.join(
 						vendorRoot,
-						"common/security-features/resources/common.sub.js"
+						"common/security-features/resources/common.sub.js",
 					),
-					"utf8"
+					"utf8",
 				);
 				serveTemplateResponse(
 					response,
@@ -490,7 +490,7 @@ async function createWptServer(): Promise<{
 						httpsPort,
 						crossHost,
 					}),
-					{ "Content-Type": "application/javascript; charset=utf-8" }
+					{ "Content-Type": "application/javascript; charset=utf-8" },
 				);
 				return;
 			}
@@ -511,7 +511,7 @@ async function createWptServer(): Promise<{
 					JSON.stringify({ headers: request.headers }),
 					{
 						"Content-Type": "application/json; charset=utf-8",
-					}
+					},
 				);
 				return;
 			}
@@ -531,9 +531,9 @@ async function createWptServer(): Promise<{
 				const template = await fs.readFile(
 					path.join(
 						vendorRoot,
-						"common/security-features/subresource/template/document.html.template"
+						"common/security-features/subresource/template/document.html.template",
 					),
-					"utf8"
+					"utf8",
 				);
 				const body = template.replace("%(headers)s", headersJson(request));
 				serveTemplateResponse(response, body, {
@@ -552,7 +552,7 @@ async function createWptServer(): Promise<{
 					`window.referrer = '${escapeForSingleQuotedJs(referer)}';`,
 					{
 						"Content-Type": "application/javascript; charset=utf-8",
-					}
+					},
 				);
 				return;
 			}
@@ -561,7 +561,7 @@ async function createWptServer(): Promise<{
 				requestUrl.pathname === "/common/security-features/scope/document.py"
 			) {
 				const policyDeliveries = JSON.parse(
-					requestUrl.searchParams.get("policyDeliveries") || "[]"
+					requestUrl.searchParams.get("policyDeliveries") || "[]",
 				) as Array<{
 					deliveryType: string;
 					key: string;
@@ -592,9 +592,9 @@ async function createWptServer(): Promise<{
 				const template = await fs.readFile(
 					path.join(
 						vendorRoot,
-						"common/security-features/scope/template/document.html.template"
+						"common/security-features/scope/template/document.html.template",
 					),
-					"utf8"
+					"utf8",
 				);
 				const body = template
 					.replace("%(meta)s", meta)
@@ -633,7 +633,7 @@ async function createWptServer(): Promise<{
 						} else {
 							await callback.fail(
 								parsed.message || "WPT reported failure",
-								parsed.details
+								parsed.details,
 							);
 						}
 						response.writeHead(204, {
@@ -679,9 +679,7 @@ async function createWptServer(): Promise<{
 				for (const [key, value] of parsedHeaders) {
 					headers[key] = value;
 				}
-			} catch {
-				// No WPT .headers file for this resource.
-			}
+			} catch {}
 
 			serveTemplateResponse(
 				response,
@@ -691,7 +689,7 @@ async function createWptServer(): Promise<{
 					httpsPort,
 					crossHost,
 				}),
-				headers
+				headers,
 			);
 		} catch (error) {
 			response.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
@@ -741,9 +739,9 @@ function wptPageTest(entryPath: string): Test {
 		name: testNameForPath(entryPath),
 		port: 0,
 		path: basePath,
-		scramjetOnly: true,
+		ramjetOnly: true,
 		reloadHarness: true,
-		topLevelScramjet: false,
+		topLevelRamjet: false,
 		warmProxiedNavigation: true,
 		timeoutMs: 15000,
 		async start({ pass, fail }) {
@@ -754,7 +752,7 @@ function wptPageTest(entryPath: string): Test {
 			const url = new URL(basePath, "http://localhost");
 			url.searchParams.set(
 				"runway_report",
-				`http://localhost:${servers.httpPort}/__runway_report?token=${token}`
+				`http://localhost:${servers.httpPort}/__runway_report?token=${token}`,
 			);
 			test.path = `${url.pathname}${url.search}`;
 		},

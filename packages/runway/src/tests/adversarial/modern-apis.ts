@@ -1,10 +1,5 @@
 import { basicTest } from "../../testcommon.ts";
 
-// Newer platform APIs that sites reach for directly or feature-detect on:
-// streams (every incremental-response library), CookieStore (the async cookie
-// API that replaces document.cookie), permission and media surfaces, the
-// storage manager, AbortSignal statics and WebCrypto operations.
-
 export default [
 	basicTest({
 		name: "modern-streams-response",
@@ -62,7 +57,7 @@ export default [
 			assert(await cookieStore.get("docname"),
 				"a document.cookie write is visible through cookieStore");
 			const all = (await cookieStore.getAll()).map((c) => c.name);
-			assert(!all.some((n) => n.includes("scramjet")), "no proxy cookies exposed: " + JSON.stringify(all));
+			assert(!all.some((n) => n.includes("ramjet")), "no proxy cookies exposed: " + JSON.stringify(all));
 			await cookieStore.delete("csname");
 			assert(!document.cookie.includes("csname"), "cookieStore.delete: " + document.cookie);
 		`,

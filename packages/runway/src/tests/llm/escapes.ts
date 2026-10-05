@@ -10,7 +10,7 @@ function escapeTest(props: { name: string; js: string }) {
 		name: props.name,
 		js: props.js,
 		autoPass: false,
-		scramjetOnly: true,
+		ramjetOnly: true,
 	});
 }
 
@@ -334,7 +334,7 @@ export default [
 	serverTest({
 		name: "escapes-xhr-responsexml-xhtml-img-onerror",
 		autoPass: false,
-		scramjetOnly: true,
+		ramjetOnly: true,
 		js: `
 			const xhr = new XMLHttpRequest();
 			xhr.open("GET", "/payload.xhtml");
@@ -358,7 +358,7 @@ export default [
 	serverTest({
 		name: "escapes-xhr-response-document-html-img-onerror",
 		autoPass: false,
-		scramjetOnly: true,
+		ramjetOnly: true,
 		js: `
 			const xhr = new XMLHttpRequest();
 			xhr.open("GET", "/payload.html");
@@ -381,7 +381,7 @@ export default [
 	serverTest({
 		name: "escapes-xhr-response-document-xhtml-img-onerror",
 		autoPass: false,
-		scramjetOnly: true,
+		ramjetOnly: true,
 		js: `
 			const xhr = new XMLHttpRequest();
 			xhr.open("GET", "/payload.xhtml");

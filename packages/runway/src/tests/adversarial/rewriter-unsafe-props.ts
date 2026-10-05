@@ -1,15 +1,5 @@
 import { basicTest } from "../../testcommon.ts";
 
-// `location`, `top`, `parent` and `eval` are the rewriter's UNSAFE_GLOBALS, so
-// *every* `.location` / `.top` / `.parent` / `.eval` property access in a page
-// is redirected through the $scramjet__<name> accessor pair installed on
-// Object.prototype (see client/shared/wrap.ts).
-//
-// That means ordinary objects that happen to carry one of those keys - weather
-// data with a `location`, a DOMRect-ish `{top}`, a tree node with a `parent` -
-// take the same path. These tests pin down that the redirection stays
-// invisible to the page.
-
 export default [
 	basicTest({
 		name: "unsafeprops-read-write-plain-object",
@@ -58,7 +48,7 @@ export default [
 	basicTest({
 		name: "unsafeprops-accessor-invocation-count",
 		js: `
-			// the $scramjet__location getter reads this.location, so a page-level
+			// the $ramjet__location getter reads this.location, so a page-level
 			// accessor must not be invoked more than once per access
 			let gets = 0, sets = 0, lastSet;
 			const o = {
@@ -128,15 +118,7 @@ export default [
 		`,
 	}),
 
-	// ------------------------------------------------------------------
-	// where the redirection becomes observable
-	// ------------------------------------------------------------------
 	basicTest({
-		// KNOWN FAILURE: the trap sees $scramjet__location instead of location,
-		// and is entered twice (once for the mangled name, once for the read the
-		// accessor performs). Every Proxy-based reactivity system - Vue 3, MobX,
-		// immer - keys its dependency tracking on exactly this argument, so a
-		// reactive object with a `location` field silently stops updating.
 		name: "unsafeprops-proxy-get-trap-key",
 		js: `
 			const log = [];
@@ -150,7 +132,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: same, for writes.
 		name: "unsafeprops-proxy-set-trap-key",
 		js: `
 			const log = [];
@@ -165,11 +146,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: the accessor lives on Object.prototype, so an object
-		// with a null prototype never reaches it - the write lands in an own
-		// property literally called $scramjet__location. Null-prototype
-		// dictionaries are the standard shape for parsed query strings, i18n
-		// tables and JSON maps.
 		name: "unsafeprops-null-prototype",
 		js: `
 			const o = Object.create(null);
@@ -181,9 +157,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: rewritten to `delete o.$scramjet__location`, which
-		// removes nothing and still reports success. `delete node.parent` is a
-		// standard way to break reference cycles before serializing a tree.
 		name: "unsafeprops-delete",
 		js: `
 			const o = { location: 1, top: 2, parent: 3, eval: 4, keep: 5 };
@@ -195,8 +168,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: the write is absorbed by the Object.prototype setter,
-		// which reassigns in sloppy mode, so the strict-mode TypeError is lost.
 		name: "unsafeprops-frozen-strict-assign",
 		js: `
 			"use strict";
@@ -208,10 +179,6 @@ export default [
 		`,
 	}),
 	basicTest({
-		// KNOWN FAILURE: `super.location` becomes `super.$scramjet__location`,
-		// which finds the Object.prototype accessor; its getter then reads
-		// `this.location`, so the lookup collapses onto the instance's own
-		// property instead of continuing up the prototype chain.
 		name: "unsafeprops-super",
 		js: `
 			class B { constructor() { this.location = "own"; } get top() { return "protoTop"; } }
