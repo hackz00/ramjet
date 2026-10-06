@@ -130,6 +130,9 @@ const closeReason = (reason: unknown): string => {
 export async function startAssistedServer(
 	options: ServerOptions = {},
 ): Promise<AssistedServer> {
+	const port = options.port ?? 0;
+	if (!Number.isInteger(port) || port < 0 || port > 65535)
+		throw new RangeError("port must be an integer from 0 to 65535");
 	const guard = createGuardedLookup({ ...DEFAULT_GUARD, ...options.guard });
 	const baseConnect = buildConnector({
 		allowH2: true,
@@ -576,10 +579,24 @@ export async function startAssistedServer(
 		socket.on("error", () => {});
 	});
 
-	if (!options.server)
-		await new Promise<void>((resolve) =>
-			server.listen(options.port ?? 0, options.host ?? "127.0.0.1", resolve),
-		);
+	if (!options.server) {
+		let onError: (error: Error) => void;
+		try {
+			await new Promise<void>((resolve, reject) => {
+				onError = reject;
+				server.once("error", onError);
+				wss.once("error", onError);
+				server.listen(port, options.host ?? "127.0.0.1", resolve);
+			});
+		} catch (error) {
+			await new Promise<void>((resolve) => wss.close(() => resolve()));
+			await agent.close();
+			throw error;
+		} finally {
+			server.off("error", onError!);
+			wss.off("error", onError!);
+		}
+	}
 	const address = server.address();
 	return {
 		port: typeof address === "object" && address ? address.port : 0,

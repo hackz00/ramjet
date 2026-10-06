@@ -1,7 +1,7 @@
 import { iswindow } from "@client/entry";
 import { RAMJETCLIENT } from "@/symbols";
 import { RamjetClient } from "@client/index";
-import { Object_defineProperty } from "@/shared/snapshot";
+import { Object_defineProperty, JSON_stringify, JSON_parse, _WeakMap } from "@/shared/snapshot";
 import { POLLUTANT } from "./realm";
 
 export default function (client: RamjetClient, self: Self) {
@@ -52,12 +52,54 @@ export default function (client: RamjetClient, self: Self) {
 			},
 		});
 
+	const channels = new _WeakMap<
+		BroadcastChannel,
+		{ name: string; origin: string }
+	>([]);
+	client.Proxy("BroadcastChannel", {
+		construct(ctx) {
+			if ((ctx.args as unknown[]).length === 0) return ctx.return(ctx.call());
+			const name = `${ctx.args[0]}`;
+			let owner = client;
+			while (
+				owner.url.href === "about:blank" ||
+				owner.url.href === "about:srcdoc"
+			) {
+				const parent = owner.global.parent?.[RAMJETCLIENT];
+				if (!parent || parent === owner) break;
+				owner = parent;
+			}
+			const origin = owner.url.origin;
+			if (origin === "null")
+				throw new self.DOMException(
+					"Opaque origin cannot open a channel",
+					"SecurityError",
+				);
+			ctx.args[0] = JSON_stringify(["ramjet-channel-v1", origin, name]);
+			const channel = ctx.call();
+			channels.set(channel, { name, origin });
+			ctx.return(channel);
+		},
+	});
+	client.Trap("BroadcastChannel.prototype.name", {
+		get(ctx) {
+			const nativeName = ctx.get();
+			const own = channels.get(ctx.this);
+			if (own) return own.name;
+			try {
+				const parts = JSON_parse(nativeName);
+				if (parts?.[0] === "ramjet-channel-v1" && typeof parts[2] === "string")
+					return parts[2];
+			} catch {}
+			return nativeName;
+		},
+	});
 	client.Proxy("BroadcastChannel.prototype.postMessage", {
 		apply(ctx) {
 			ctx.args[0] = {
 				$ramjet$messagetype: "window",
 
-				$ramjet$origin: client.url.origin,
+				$ramjet$origin: channels.get(ctx.this)?.origin ?? client.url.origin,
 				$ramjet$data: ctx.args[0],
 			};
 		},

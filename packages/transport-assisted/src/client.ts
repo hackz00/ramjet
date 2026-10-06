@@ -55,6 +55,7 @@ export type AssistedOptions = {
 	token?: string;
 
 	pingIntervalMs?: number;
+	handshakeTimeoutMs?: number;
 	WebSocket?: typeof WebSocket;
 };
 
@@ -141,6 +142,7 @@ export class AssistedTransport implements ProxyTransport {
 	readonly supportsNotModified = true;
 	private socket: WebSocket | null = null;
 	private connecting: Promise<WebSocket> | null = null;
+	private cancelConnecting?: (error: Error) => void;
 	private nextId = 1;
 	private readonly pending = new Map<number, Pending>();
 	private readonly queue: Queued[] = [];
@@ -155,12 +157,16 @@ export class AssistedTransport implements ProxyTransport {
 	private readonly options: AssistedOptions;
 
 	constructor(options: AssistedOptions) {
+		const timeout = options.handshakeTimeoutMs ?? 15_000;
+		if (!Number.isFinite(timeout) || timeout <= 0 || timeout > 2_147_483_647)
+			throw new RangeError(
+				"handshakeTimeoutMs must be a positive finite timeout",
+			);
 		this.options = options;
 	}
 
 	async init(): Promise<void> {
 		await this.ensureConnected();
-		this.ready = true;
 	}
 
 	preconnect(target: string): void {
@@ -173,15 +179,44 @@ export class AssistedTransport implements ProxyTransport {
 	}
 
 	private ensureConnected(): Promise<WebSocket> {
-		if (this.socket && this.socket.readyState === 1)
-			return Promise.resolve(this.socket);
 		if (this.connecting) return this.connecting;
+		if (this.ready && this.socket?.readyState === 1)
+			return Promise.resolve(this.socket);
+		this.ready = false;
+		this.maxStreams = 256;
 		const WS = this.options.WebSocket ?? WebSocket;
-		this.connecting = new Promise<WebSocket>((resolve, reject) => {
+		const connecting = new Promise<WebSocket>((resolve, reject) => {
 			const socket = new WS(this.options.url);
+			this.socket = socket;
 			socket.binaryType = "arraybuffer";
 			let helloDone = false;
-			socket.onopen = () =>
+			let settled = false;
+			const disconnect = (error: Error) => {
+				if (this.socket !== socket) return;
+				this.socket = null;
+				this.ready = false;
+				clearInterval(this.pingTimer);
+				this.failAll(error);
+			};
+			const cleanup = () => {
+				clearTimeout(timer);
+				if (this.cancelConnecting === fail) this.cancelConnecting = undefined;
+			};
+			const fail = (error: Error) => {
+				if (settled) return;
+				settled = true;
+				cleanup();
+				disconnect(error);
+				reject(error);
+				socket.close();
+			};
+			const timer = setTimeout(
+				() => fail(new Error("assisted transport: handshake timed out")),
+				this.options.handshakeTimeoutMs ?? 15_000,
+			);
+			this.cancelConnecting = fail;
+			socket.onopen = () => {
+				if (this.socket !== socket || settled) return;
 				socket.send(
 					encodeJson(
 						T.HELLO,
@@ -189,44 +224,64 @@ export class AssistedTransport implements ProxyTransport {
 						this.options.token ? { token: this.options.token } : {},
 					),
 				);
-			socket.onmessage = (event) => {
-				if (typeof event.data === "string") return;
-				const frame = decodeFrame(event.data as ArrayBuffer);
-				if (!frame) return;
-				this.lastRx = Date.now();
-				if (!helloDone && frame.type === T.HELLO_OK) {
-					helloDone = true;
-					try {
-						const max = parseJson<{ maxStreams?: number }>(
-							frame.payload,
-						).maxStreams;
-						if (typeof max === "number" && max > 0) this.maxStreams = max;
-					} catch {}
-					return resolve(socket);
-				}
-				this.onFrame(frame.type, frame.id, frame.payload);
 			};
-			socket.onerror = () =>
-				reject(new Error("assisted transport: connection failed"));
+			socket.onmessage = (event) => {
+				if (this.socket !== socket) return;
+				if (typeof event.data === "string") return;
+				try {
+					const frame = decodeFrame(event.data as ArrayBuffer);
+					if (!frame) return;
+					this.lastRx = Date.now();
+					if (!helloDone && frame.type === T.HELLO_OK) {
+						const info = parseJson<{ maxStreams?: number }>(frame.payload);
+						if (!info || typeof info !== "object" || Array.isArray(info))
+							throw new Error(
+								"assisted transport: invalid handshake acknowledgement",
+							);
+						const max = info?.maxStreams;
+						if (max !== undefined && (!Number.isSafeInteger(max) || max <= 0))
+							throw new Error("assisted transport: invalid stream limit");
+						if (max !== undefined) this.maxStreams = max;
+						helloDone = settled = true;
+						cleanup();
+						return resolve(socket);
+					}
+					if (!helloDone)
+						throw new Error(
+							"assisted transport: missing handshake acknowledgement",
+						);
+					this.onFrame(frame.type, frame.id, frame.payload);
+				} catch (error) {
+					const failure =
+						error instanceof Error ? error : new Error(String(error));
+					if (!helloDone) fail(failure);
+					else {
+						disconnect(failure);
+						socket.close();
+					}
+				}
+			};
+			socket.onerror = () => {
+				const error = new Error("assisted transport: connection failed");
+				if (!helloDone) fail(error);
+				else {
+					disconnect(error);
+					socket.close();
+				}
+			};
 			socket.onclose = () => {
 				if (!helloDone)
-					reject(
+					fail(
 						new Error(
 							"assisted transport: unauthorized or closed during handshake",
 						),
 					);
-
-				if (this.socket && this.socket !== socket) return;
-				this.socket = null;
-				clearInterval(this.pingTimer);
-				this.failAll(new Error("assisted transport: disconnected"));
+				else disconnect(new Error("assisted transport: disconnected"));
 			};
-			this.socket = socket;
-		}).finally(() => {
-			this.connecting = null;
-		});
-		this.connecting.then(
-			(socket) => {
+		})
+			.then((socket) => {
+				if (this.socket !== socket || socket.readyState !== 1)
+					throw new Error("assisted transport: disconnected");
 				this.ready = true;
 				const every = this.options.pingIntervalMs ?? 20_000;
 				clearInterval(this.pingTimer);
@@ -240,20 +295,30 @@ export class AssistedTransport implements ProxyTransport {
 					}, every);
 					(this.pingTimer as { unref?: () => void }).unref?.();
 				}
-			},
-			() => {},
-		);
-		return this.connecting;
+				return socket;
+			})
+			.finally(() => {
+				if (this.connecting === connecting) this.connecting = null;
+			});
+		this.connecting = connecting;
+		return connecting;
 	}
 
 	close(): void {
+		const error = new Error("assisted transport: closed");
+		if (this.cancelConnecting) return this.cancelConnecting(error);
+		const socket = this.socket;
+		this.socket = null;
+		this.ready = false;
 		clearInterval(this.pingTimer);
-		this.socket?.close();
+		this.failAll(error);
+		socket?.close();
 	}
 
 	private failAll(error: Error) {
 		for (const [id, p] of [...this.pending]) {
 			this.release(id);
+			p.signal?.removeEventListener("abort", p.onAbort!);
 			if (p.responded) p.controller?.error(error);
 			else p.reject(error);
 		}
@@ -279,6 +344,7 @@ export class AssistedTransport implements ProxyTransport {
 	}
 
 	private drain() {
+		if (!this.ready) return;
 		while (this.queue.length && this.hasRoom()) this.queue.shift()!.launch();
 	}
 
